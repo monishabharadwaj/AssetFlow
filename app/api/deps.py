@@ -6,17 +6,21 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.repositories.allocation_repository import AllocationRepository
 from app.repositories.asset_repository import AssetRepository
+from app.repositories.dashboard_repository import DashboardRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.employee_repository import EmployeeRepository
 from app.repositories.health_history_repository import HealthHistoryRepository
 from app.repositories.maintenance_repository import MaintenanceRepository
+from app.repositories.timeline_repository import TimelineRepository
 from app.repositories.transfer_repository import TransferRepository
 from app.services.allocation_service import AllocationService
 from app.services.asset_service import AssetService
+from app.services.dashboard_service import DashboardService
 from app.services.department_service import DepartmentService
 from app.services.employee_service import EmployeeService
 from app.services.health_history_service import HealthHistoryService
 from app.services.maintenance_service import MaintenanceService
+from app.services.timeline_service import TimelineService
 from app.services.transfer_service import TransferService
 
 
@@ -96,3 +100,24 @@ def get_health_history_service(
     asset_service: AssetService = Depends(get_asset_service),
 ) -> HealthHistoryService:
     return HealthHistoryService(repository, asset_service)
+
+
+def get_dashboard_repository(db: Session = Depends(get_db)) -> DashboardRepository:
+    return DashboardRepository(db)
+
+
+def get_dashboard_service(
+    repository: DashboardRepository = Depends(get_dashboard_repository),
+) -> DashboardService:
+    return DashboardService(repository)
+
+
+def get_timeline_repository(db: Session = Depends(get_db)) -> TimelineRepository:
+    return TimelineRepository(db)
+
+
+def get_timeline_service(
+    repository: TimelineRepository = Depends(get_timeline_repository),
+    asset_service: AssetService = Depends(get_asset_service),
+) -> TimelineService:
+    return TimelineService(repository, asset_service)
