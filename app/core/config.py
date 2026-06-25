@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     ml_feature_stats_path: str = str(_ML_ROOT / "feature_stats.json")
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "deepseek-r1:8b"
-    ollama_timeout_seconds: float = 10.0
+    ollama_model: str = "llama3.2:3b"
+    ollama_timeout_seconds: float = 30.0
     assistant_enabled: bool = True
     assistant_use_ollama: bool = False
 

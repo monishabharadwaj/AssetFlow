@@ -6,6 +6,12 @@
 2. Seed demo data: `py -m app.seeding --profile demo --reset`
 3. Backend: `py -m uvicorn app.main:app --reload` (port 8000)
 4. Frontend: `cd frontend && npm run dev` (port 5173)
+5. **(Optional)** Ollama for richer assistant phrasing:
+   ```powershell
+   ollama pull llama3.2:3b
+   ```
+   Set in `.env`: `ASSISTANT_USE_OLLAMA=true`, `OLLAMA_MODEL=llama3.2:3b`  
+   Without Ollama, the assistant still answers using tool data + plain-English narratives.
 
 ## Seeded demo asset tags
 
@@ -52,10 +58,24 @@ Use these fixed tags from the demo seed profile:
 - **Maintenance** → assets in `IN_MAINTENANCE` status
 - Link through to per-asset maintenance records
 
+### 6. AI Intelligence (1 min)
+
+- On **Operations Center**, click **Run AI scoring** (once per session)
+- Review **AI Recommendations** panel (plain-language maintenance priorities)
+- Open **Assistant** (header) and try:
+  - *Which assets require maintenance?*
+  - *Show high-risk assets*
+  - *What transferred recently?*
+  - *How many laptops do we have?*
+- Open `ADM-PRT-001` → **Run AI Assessment** on asset detail
+
+**API test (Swagger):** `POST /api/v1/assistant/chat` with `{"message": "Which assets require maintenance?"}`
+
 ## Talking Points
 
 - Reproducible enterprise seed: 200 active assets, 18 months of history
 - Full-stack FastAPI + PostgreSQL backend with layered architecture
 - React + TanStack Query frontend with operations-first UX
 - Asset-centric lifecycle with unified timeline and attention queue
-- ML-ready health history (`raw_features`) for future FT-Transformer work
+- FT-Transformer health prediction (MAE ~0.035 on synthetic training set)
+- Tool-based assistant with Ollama optional layer (`llama3.2:3b`) and narrative fallback
