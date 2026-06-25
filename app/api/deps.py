@@ -15,11 +15,16 @@ from app.repositories.timeline_repository import TimelineRepository
 from app.repositories.transfer_repository import TransferRepository
 from app.services.allocation_service import AllocationService
 from app.services.asset_service import AssetService
+from app.services.assistant_service import AssistantService
+from app.services.assistant_tools import AssistantTools
 from app.services.dashboard_service import DashboardService
 from app.services.department_service import DepartmentService
 from app.services.employee_service import EmployeeService
+from app.services.feature_engineering import FeatureEngineeringService
 from app.services.health_history_service import HealthHistoryService
 from app.services.maintenance_service import MaintenanceService
+from app.services.prediction_service import PredictionService
+from app.services.recommendation_service import RecommendationService
 from app.services.timeline_service import TimelineService
 from app.services.transfer_service import TransferService
 
@@ -121,3 +126,45 @@ def get_timeline_service(
     asset_service: AssetService = Depends(get_asset_service),
 ) -> TimelineService:
     return TimelineService(repository, asset_service)
+
+
+def get_feature_engineering_service() -> FeatureEngineeringService:
+    return FeatureEngineeringService()
+
+
+def get_prediction_service(
+    asset_service: AssetService = Depends(get_asset_service),
+    feature_service: FeatureEngineeringService = Depends(get_feature_engineering_service),
+    health_service: HealthHistoryService = Depends(get_health_history_service),
+    asset_repository: AssetRepository = Depends(get_asset_repository),
+) -> PredictionService:
+    return PredictionService(asset_service, feature_service, health_service, asset_repository)
+
+
+def get_recommendation_service(
+    prediction_service: PredictionService = Depends(get_prediction_service),
+    dashboard_repository: DashboardRepository = Depends(get_dashboard_repository),
+) -> RecommendationService:
+    return RecommendationService(prediction_service, dashboard_repository)
+
+
+def get_assistant_tools(
+    dashboard_service: DashboardService = Depends(get_dashboard_service),
+    asset_service: AssetService = Depends(get_asset_service),
+    prediction_service: PredictionService = Depends(get_prediction_service),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
+    dashboard_repository: DashboardRepository = Depends(get_dashboard_repository),
+) -> AssistantTools:
+    return AssistantTools(
+        dashboard_service,
+        asset_service,
+        prediction_service,
+        recommendation_service,
+        dashboard_repository,
+    )
+
+
+def get_assistant_service(
+    tools: AssistantTools = Depends(get_assistant_tools),
+) -> AssistantService:
+    return AssistantService(tools)

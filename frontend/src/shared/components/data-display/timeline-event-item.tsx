@@ -10,6 +10,28 @@ type TimelineEventItemProps = {
   details?: Record<string, unknown>;
 };
 
+const HIDDEN_DETAIL_KEYS = new Set(["action", "health_score"]);
+
+const DETAIL_LABELS: Record<string, string> = {
+  employee: "Employee",
+  from_department: "From",
+  to_department: "To",
+  from_location: "From location",
+  to_location: "To location",
+  reason: "Reason",
+  type: "Type",
+  status: "Status",
+  scheduled_date: "Scheduled",
+  completed_date: "Completed",
+  cost: "Cost",
+  description: "Description",
+  summary: "Summary",
+  condition_rating: "Condition",
+  failure_count: "Failures",
+  returned_at: "Returned",
+  notes: "Notes",
+};
+
 function getEventIcon(eventType: string): LucideIcon {
   if (eventType.includes("ALLOCATION") || eventType.includes("ASSIGN")) return UserCheck;
   if (eventType.includes("TRANSFER")) return ArrowRightLeft;
@@ -18,9 +40,28 @@ function getEventIcon(eventType: string): LucideIcon {
   return UserCheck;
 }
 
+function formatDetailValue(key: string, value: unknown): string {
+  if (key === "cost" && typeof value === "number") {
+    return `$${value.toFixed(2)}`;
+  }
+  if (key === "summary" || key === "description" || key === "reason" || key === "notes") {
+    return String(value);
+  }
+  return String(value);
+}
+
 export function TimelineEventItem({ eventType, title, occurredAt, details }: TimelineEventItemProps) {
   const Icon = getEventIcon(eventType);
-  const detailEntries = details ? Object.entries(details).filter(([, v]) => v != null && v !== "") : [];
+  const detailEntries = details
+    ? Object.entries(details).filter(
+        ([key, value]) => !HIDDEN_DETAIL_KEYS.has(key) && value != null && value !== "",
+      )
+    : [];
+
+  const summary = details?.summary as string | undefined;
+  const visibleEntries = summary
+    ? detailEntries.filter(([key]) => key !== "summary")
+    : detailEntries;
 
   return (
     <div className="flex gap-3 rounded-lg border p-3">
@@ -29,12 +70,13 @@ export function TimelineEventItem({ eventType, title, occurredAt, details }: Tim
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{title}</p>
-        {detailEntries.length > 0 ? (
+        {summary ? <p className="mt-1 text-sm text-muted-foreground">{summary}</p> : null}
+        {visibleEntries.length > 0 ? (
           <dl className="mt-2 grid gap-1 text-xs text-muted-foreground">
-            {detailEntries.slice(0, 4).map(([key, value]) => (
+            {visibleEntries.slice(0, 5).map(([key, value]) => (
               <div key={key} className="flex gap-2">
-                <dt className="font-medium capitalize">{key.replace(/_/g, " ")}:</dt>
-                <dd className="truncate">{String(value)}</dd>
+                <dt className="shrink-0 font-medium">{DETAIL_LABELS[key] ?? key.replace(/_/g, " ")}:</dt>
+                <dd className="min-w-0">{formatDetailValue(key, value)}</dd>
               </div>
             ))}
           </dl>
@@ -45,4 +87,18 @@ export function TimelineEventItem({ eventType, title, occurredAt, details }: Tim
       </div>
     </div>
   );
+}
+
+export function groupTimelineByDay<T extends { occurred_at: string }>(items: T[]): Array<{ day: string; items: T[] }> {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const dayKey = new Date(item.occurred_at).toDateString();
+    const existing = groups.get(dayKey) ?? [];
+    existing.push(item);
+    groups.set(dayKey, existing);
+  }
+  return Array.from(groups.entries()).map(([, dayItems]) => ({
+    day: dayItems[0]!.occurred_at,
+    items: dayItems,
+  }));
 }

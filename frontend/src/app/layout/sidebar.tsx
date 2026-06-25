@@ -4,7 +4,7 @@ import { NavLink } from "react-router-dom";
 import { cn } from "../../shared/lib/utils";
 
 const navItems = [
-  { label: "Dashboard", to: "/dashboard", icon: LayoutGrid },
+  { label: "Operations", to: "/dashboard", icon: LayoutGrid },
   { label: "Assets", to: "/assets", icon: BarChart3 },
   { label: "Maintenance", to: "/maintenance", icon: ClipboardList },
   { label: "Departments", to: "/departments", icon: Building2 },

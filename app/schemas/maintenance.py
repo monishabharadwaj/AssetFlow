@@ -66,3 +66,13 @@ class MaintenanceResponse(BaseModel):
 
 
 MaintenanceListResponse = PaginatedResponse[MaintenanceResponse]
+
+
+class MaintenanceWorkQueueItem(BaseModel):
+    record: MaintenanceResponse
+    asset_id: uuid.UUID
+    asset_tag: str
+    asset_name: str
+
+
+MaintenanceWorkQueueResponse = PaginatedResponse[MaintenanceWorkQueueItem]

@@ -5,7 +5,7 @@ import { queryKeys } from "../../shared/api/query-keys";
 import { fetchAsset } from "../../features/assets/api/assets-api";
 
 const labelMap: Record<string, string> = {
-  dashboard: "Dashboard",
+  dashboard: "Operations",
   assets: "Assets",
   maintenance: "Maintenance",
   departments: "Departments",

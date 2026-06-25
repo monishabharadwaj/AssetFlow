@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { PageHeader } from "../../../shared/components/data-display/page-header";
@@ -7,7 +8,9 @@ import { EmptyState } from "../../../shared/components/feedback/empty-state";
 import { buttonVariants } from "../../../shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../shared/components/ui/card";
 import { cn } from "../../../shared/lib/utils";
+import { formatDate } from "../../../shared/lib/format";
 import type { Asset } from "../../../shared/api/types";
+import { fetchMaintenanceWorkQueue, type MaintenanceWorkQueueItem } from "../../intelligence/api/intelligence-api";
 import { useDashboardSummary } from "../../dashboard/hooks/use-dashboard-summary";
 import { useAssetsSearch } from "../../assets/hooks/use-assets";
 
@@ -18,6 +21,28 @@ export function MaintenancePageContent() {
     page_size: 50,
     current_status: "IN_MAINTENANCE",
   });
+
+  const workQueue = useQuery({
+    queryKey: ["maintenance", "work-queue"],
+    queryFn: () => fetchMaintenanceWorkQueue(1, 30),
+  });
+
+  const queueColumns: ColumnDef<MaintenanceWorkQueueItem>[] = [
+    {
+      id: "tag",
+      header: "Asset",
+      cell: (row) => (
+        <Link to={`/assets/${row.asset_id}?tab=maintenance`} className="font-medium text-primary hover:underline">
+          {row.asset_tag}
+        </Link>
+      ),
+    },
+    { id: "name", header: "Name", cell: (row) => row.asset_name },
+    { id: "type", header: "Type", cell: (row) => row.record.maintenance_type },
+    { id: "status", header: "Status", cell: (row) => <StatusBadge status={row.record.status as Asset["current_status"]} /> },
+    { id: "scheduled", header: "Scheduled", cell: (row) => formatDate(row.record.scheduled_date) },
+    { id: "desc", header: "Description", cell: (row) => row.record.description },
+  ];
 
   const columns: ColumnDef<Asset>[] = [
     {
@@ -55,19 +80,23 @@ export function MaintenancePageContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Maintenance Due</CardTitle>
+          <CardTitle>Overdue Work Queue</CardTitle>
           <CardDescription>
-            {dashboard?.maintenance_due_count ?? 0} scheduled or in-progress records are due today or
-            overdue. Manage records from each asset&apos;s maintenance tab.
+            {dashboard?.maintenance_due_count ?? 0} scheduled or in-progress records are due today or overdue.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Link
-            to="/assets?current_status=IN_MAINTENANCE"
-            className={cn(buttonVariants({ variant: "secondary" }))}
-          >
-            View all in-maintenance assets
-          </Link>
+          {workQueue.isError ? (
+            <EmptyState title="Failed to load work queue" />
+          ) : (
+            <EntityDataTable
+              columns={queueColumns}
+              data={workQueue.data?.items ?? []}
+              isLoading={workQueue.isLoading}
+              emptyMessage="No overdue maintenance records."
+              rowKey={(r) => r.record.id}
+            />
+          )}
         </CardContent>
       </Card>
 

@@ -4,6 +4,7 @@ import uuid
 
 from app.repositories.timeline_repository import TimelineRepository
 from app.schemas.timeline import AssetTimelineEvent, AssetTimelineResponse
+from app.services import narrative as narr
 from app.services.asset_service import AssetService
 
 
@@ -23,18 +24,28 @@ class TimelineService:
         page: int,
         page_size: int,
     ) -> AssetTimelineResponse:
-        self.asset_service.get_by_id(asset_id)
+        asset = self.asset_service.get_by_id(asset_id)
+        asset_name = asset.name
 
         events: list[AssetTimelineEvent] = []
 
         for allocation in self.repository.allocations_for_asset(asset_id):
+            employee = allocation.employee
+            emp_name = narr.employee_display(employee.first_name, employee.last_name)
+            title = narr.allocation_headline(
+                allocation.action,
+                asset_name=asset_name,
+                asset_tag=asset.asset_tag,
+                employee_name=emp_name,
+            )
             events.append(
                 AssetTimelineEvent(
                     event_type="ALLOCATION",
                     occurred_at=allocation.allocated_at,
-                    title=f"{allocation.action.value.title()} asset allocation",
+                    title=title,
                     details={
-                        "employee_id": str(allocation.employee_id),
+                        "employee": emp_name,
+                        "action": allocation.action.value,
                         "returned_at": allocation.returned_at.isoformat()
                         if allocation.returned_at
                         else None,
@@ -44,14 +55,17 @@ class TimelineService:
             )
 
         for transfer in self.repository.transfers_for_asset(asset_id):
+            from_name = transfer.from_department.name
+            to_name = transfer.to_department.name
+            title = f"{asset_name} moved to {to_name}"
             events.append(
                 AssetTimelineEvent(
                     event_type="TRANSFER",
                     occurred_at=transfer.transferred_at,
-                    title="Asset transferred",
+                    title=title,
                     details={
-                        "from_department_id": str(transfer.from_department_id),
-                        "to_department_id": str(transfer.to_department_id),
+                        "from_department": from_name,
+                        "to_department": to_name,
                         "from_location": transfer.from_location,
                         "to_location": transfer.to_location,
                         "reason": transfer.reason,
@@ -61,14 +75,19 @@ class TimelineService:
 
         for maintenance in self.repository.maintenance_for_asset(asset_id):
             occurred_at = maintenance.updated_at
+            mtype = maintenance.maintenance_type.value.replace("_", " ").title()
+            if maintenance.status.value == "COMPLETED":
+                title = f"{asset_name} completed {mtype.lower()} maintenance"
+            else:
+                title = f"{asset_name} — {mtype} maintenance {maintenance.status.value.replace('_', ' ').lower()}"
             events.append(
                 AssetTimelineEvent(
                     event_type="MAINTENANCE",
                     occurred_at=occurred_at,
-                    title="Maintenance record updated",
+                    title=title,
                     details={
-                        "maintenance_type": maintenance.maintenance_type.value,
-                        "status": maintenance.status.value,
+                        "type": mtype,
+                        "status": maintenance.status.value.replace("_", " ").title(),
                         "scheduled_date": maintenance.scheduled_date.isoformat()
                         if maintenance.scheduled_date
                         else None,
@@ -76,25 +95,28 @@ class TimelineService:
                         if maintenance.completed_date
                         else None,
                         "cost": float(maintenance.cost) if maintenance.cost is not None else None,
+                        "description": maintenance.description,
                     },
                 )
             )
 
         for health in self.repository.health_history_for_asset(asset_id):
+            score = float(health.health_score) if health.health_score is not None else None
+            title = narr.health_snapshot_title(health_score=score)
             events.append(
                 AssetTimelineEvent(
                     event_type="HEALTH_SNAPSHOT",
                     occurred_at=health.recorded_at,
-                    title="Asset health snapshot recorded",
+                    title=title,
                     details={
-                        "health_score": float(health.health_score)
-                        if health.health_score is not None
-                        else None,
+                        "summary": narr.health_snapshot_message(
+                            asset_name=asset_name,
+                            health_score=score,
+                            condition_rating=health.condition_rating,
+                        ),
+                        "health_score": score,
                         "condition_rating": health.condition_rating,
                         "failure_count": health.failure_count,
-                        "depreciation_ratio": float(health.depreciation_ratio)
-                        if health.depreciation_ratio is not None
-                        else None,
                     },
                 )
             )

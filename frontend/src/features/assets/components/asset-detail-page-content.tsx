@@ -1,19 +1,23 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { EntityDataTable, type ColumnDef } from "../../../shared/components/data-display/entity-data-table";
 import { PaginationBar } from "../../../shared/components/data-display/pagination-bar";
 import { StatusBadge } from "../../../shared/components/data-display/status-badge";
-import { TimelineEventItem } from "../../../shared/components/data-display/timeline-event-item";
+import {
+  groupTimelineByDay,
+  TimelineEventItem,
+} from "../../../shared/components/data-display/timeline-event-item";
 import { EmptyState } from "../../../shared/components/feedback/empty-state";
 import { Skeleton } from "../../../shared/components/ui/skeleton";
 import { Button } from "../../../shared/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../../shared/components/ui/card";
+import { Card, CardContent } from "../../../shared/components/ui/card";
 import { formatCurrency, formatDate } from "../../../shared/lib/format";
+import { formatDayHeader } from "../../../shared/lib/date";
 import type { Allocation, HealthHistory, Maintenance, Transfer } from "../../../shared/api/types";
-import { useDepartment } from "../../departments/hooks/use-departments";
-import { useEmployee } from "../../employees/hooks/use-employees";
-import { useAsset } from "../hooks/use-assets";
+import { useDepartmentsList } from "../../departments/hooks/use-departments";
+import { useEmployeesList } from "../../employees/hooks/use-employees";
+import { useAsset, useLookups } from "../hooks/use-assets";
 import {
   useAssetAllocations,
   useAssetHealthHistory,
@@ -21,6 +25,9 @@ import {
   useAssetTimeline,
   useAssetTransfers,
 } from "../hooks/use-lifecycle";
+import { useAssetRecommendations, usePredictHealth, useRunPrediction } from "../../intelligence/hooks/use-intelligence";
+import { AssetShowcaseCard } from "./asset-showcase-card";
+import { HealthTrendChart } from "./health-trend-chart";
 import { LifecycleActionSheets } from "./lifecycle-action-sheets";
 
 const TABS = ["overview", "timeline", "allocations", "transfers", "maintenance", "health"] as const;
@@ -38,19 +45,47 @@ export function AssetDetailPageContent() {
   const [healthOpen, setHealthOpen] = useState(false);
 
   const { data: asset, isLoading, isError, error } = useAsset(assetId);
-  const { data: dept } = useDepartment(asset?.current_department_id ?? "");
-  const { data: assignee } = useEmployee(asset?.current_assigned_employee_id ?? "");
+  const { types } = useLookups();
+  const { data: departmentsData } = useDepartmentsList({ page: 1, page_size: 200 });
+  const { data: employeesData } = useEmployeesList({ page: 1, page_size: 500 });
 
   const timeline = useAssetTimeline(assetId, page, 20);
   const allocations = useAssetAllocations(assetId, page, 20);
   const transfers = useAssetTransfers(assetId, page, 20);
   const maintenance = useAssetMaintenanceList(assetId, page, 20);
   const health = useAssetHealthHistory(assetId, page, 20);
+  const latestHealth = useAssetHealthHistory(assetId, 1, 1);
+  const prediction = usePredictHealth(assetId);
+  const runPrediction = useRunPrediction(assetId);
+  const assetRecommendations = useAssetRecommendations(assetId);
+
+  const departmentMap = useMemo(
+    () => new Map((departmentsData?.items ?? []).map((d) => [d.id, d.name])),
+    [departmentsData],
+  );
+  const employeeMap = useMemo(
+    () =>
+      new Map(
+        (employeesData?.items ?? []).map((e) => [e.id, `${e.first_name} ${e.last_name}`]),
+      ),
+    [employeesData],
+  );
+
+  const typeName = types.data?.find((t) => t.id === asset?.asset_type_id)?.name;
+  const departmentName = asset ? departmentMap.get(asset.current_department_id) : undefined;
+  const assigneeName = asset?.current_assigned_employee_id
+    ? employeeMap.get(asset.current_assigned_employee_id)
+    : undefined;
+  const healthScore = latestHealth.data?.items[0]?.health_score
+    ? Number(latestHealth.data.items[0].health_score)
+    : null;
+  const predictedHealthScore = prediction.data?.health_score ?? null;
+  const riskLevel = prediction.data?.risk_level ?? null;
 
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-40 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
     );
@@ -67,14 +102,26 @@ export function AssetDetailPageContent() {
 
   const allocationColumns: ColumnDef<Allocation>[] = [
     { id: "action", header: "Action", cell: (r) => r.action },
-    { id: "employee", header: "Employee", cell: (r) => r.employee_id.slice(0, 8) + "…" },
+    {
+      id: "employee",
+      header: "Employee",
+      cell: (r) => employeeMap.get(r.employee_id) ?? "Unknown employee",
+    },
     { id: "allocated", header: "Allocated", cell: (r) => formatDate(r.allocated_at) },
     { id: "returned", header: "Returned", cell: (r) => formatDate(r.returned_at) },
   ];
 
   const transferColumns: ColumnDef<Transfer>[] = [
-    { id: "from", header: "From Dept", cell: (r) => r.from_department_id.slice(0, 8) + "…" },
-    { id: "to", header: "To Dept", cell: (r) => r.to_department_id.slice(0, 8) + "…" },
+    {
+      id: "from",
+      header: "From Dept",
+      cell: (r) => departmentMap.get(r.from_department_id) ?? "Unknown",
+    },
+    {
+      id: "to",
+      header: "To Dept",
+      cell: (r) => departmentMap.get(r.to_department_id) ?? "Unknown",
+    },
     { id: "location", header: "To Location", cell: (r) => r.to_location },
     { id: "date", header: "Date", cell: (r) => formatDate(r.transferred_at) },
   ];
@@ -88,49 +135,57 @@ export function AssetDetailPageContent() {
 
   const healthColumns: ColumnDef<HealthHistory>[] = [
     { id: "date", header: "Recorded", cell: (r) => formatDate(r.recorded_at) },
-    { id: "score", header: "Health Score", cell: (r) => r.health_score ?? "—" },
+    {
+      id: "score",
+      header: "Health Score",
+      cell: (r) => (r.health_score != null ? `${Math.round(Number(r.health_score) * 100)}%` : "—"),
+    },
     { id: "rating", header: "Condition", cell: (r) => r.condition_rating ?? "—" },
     { id: "failures", header: "Failures", cell: (r) => r.failure_count },
   ];
 
+  const timelineGroups = timeline.data?.items
+    ? groupTimelineByDay(timeline.data.items)
+    : [];
+
+  const actionButtons = (
+    <>
+      <Button type="button" variant="secondary" size="sm" onClick={() => setAssignOpen(true)}>
+        {asset.current_status === "ASSIGNED" ? "Reassign" : "Assign"}
+      </Button>
+      <Button type="button" variant="secondary" size="sm" onClick={() => setTransferOpen(true)}>
+        Transfer
+      </Button>
+      <Button type="button" variant="secondary" size="sm" onClick={() => setMaintenanceOpen(true)}>
+        Maintenance
+      </Button>
+      <Button type="button" variant="secondary" size="sm" onClick={() => setHealthOpen(true)}>
+        Health
+      </Button>
+      <Button
+        type="button"
+        variant="default"
+        size="sm"
+        disabled={runPrediction.isPending}
+        onClick={() => void runPrediction.mutateAsync()}
+      >
+        {runPrediction.isPending ? "Assessing…" : "Run AI Assessment"}
+      </Button>
+    </>
+  );
+
   return (
     <div className="grid gap-4 md:gap-6">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <CardTitle className="text-2xl">{asset.name}</CardTitle>
-                <StatusBadge status={asset.current_status} />
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">Tag: {asset.asset_tag}</p>
-              <div className="mt-3 flex flex-wrap gap-2 text-sm text-muted-foreground">
-                <span className="rounded-md border px-2 py-1">{dept?.name ?? "Department"}</span>
-                <span className="rounded-md border px-2 py-1">{asset.current_location}</span>
-                {assignee ? (
-                  <span className="rounded-md border px-2 py-1">
-                    {assignee.first_name} {assignee.last_name}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={() => setAssignOpen(true)}>
-                {asset.current_status === "ASSIGNED" ? "Reassign" : "Assign"}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setTransferOpen(true)}>
-                Transfer
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setMaintenanceOpen(true)}>
-                Maintenance
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setHealthOpen(true)}>
-                Health
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+      <AssetShowcaseCard
+        asset={asset}
+        typeName={typeName}
+        departmentName={departmentName}
+        assigneeName={assigneeName}
+        healthScore={healthScore}
+        predictedHealthScore={predictedHealthScore}
+        riskLevel={riskLevel}
+        actions={actionButtons}
+      />
 
       <div className="flex flex-wrap gap-2 border-b pb-2">
         {TABS.map((t) => (
@@ -148,35 +203,60 @@ export function AssetDetailPageContent() {
       </div>
 
       {tab === "overview" ? (
-        <Card>
-          <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-3">
-            <MetaItem label="Serial Number" value={asset.serial_number} />
-            <MetaItem label="Manufacturer" value={asset.manufacturer} />
-            <MetaItem label="Model" value={asset.model} />
-            <MetaItem label="Purchase Date" value={formatDate(asset.purchase_date)} />
-            <MetaItem label="Purchase Cost" value={formatCurrency(asset.purchase_cost)} />
-            <MetaItem label="Warranty Expiry" value={formatDate(asset.warranty_expiry)} />
-            <MetaItem label="Active" value={asset.is_active ? "Yes" : "No"} />
-            <MetaItem label="Created" value={formatDate(asset.created_at)} />
-          </CardContent>
-        </Card>
+        <div className="grid gap-4">
+          <Card>
+            <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-3">
+              <MetaItem label="Serial Number" value={asset.serial_number} />
+              <MetaItem label="Manufacturer" value={asset.manufacturer} />
+              <MetaItem label="Model" value={asset.model} />
+              <MetaItem label="Asset Type" value={typeName} />
+              <MetaItem label="Purchase Date" value={formatDate(asset.purchase_date)} />
+              <MetaItem label="Purchase Cost" value={formatCurrency(asset.purchase_cost)} />
+              <MetaItem label="Warranty Expiry" value={formatDate(asset.warranty_expiry)} />
+              <MetaItem label="Active" value={asset.is_active ? "Yes" : "No"} />
+              <MetaItem label="Created" value={formatDate(asset.created_at)} />
+            </CardContent>
+          </Card>
+          {assetRecommendations.data?.items.length ? (
+            <Card>
+              <CardContent className="space-y-2 pt-6">
+                <h3 className="text-sm font-semibold">AI Recommendations</h3>
+                {assetRecommendations.data.items.map((rec) => (
+                  <div key={`${rec.asset_id}-${rec.maintenance_type}`} className="space-y-0.5">
+                    <p className="text-sm font-medium">{rec.title}</p>
+                    <p className="text-sm text-muted-foreground">{rec.rationale}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
       ) : null}
 
       {tab === "timeline" ? (
-        <div className="space-y-3">
+        <div className="space-y-6">
           {timeline.isLoading ? (
             <Skeleton className="h-24 w-full" />
-          ) : timeline.data?.items.length === 0 ? (
+          ) : timelineGroups.length === 0 ? (
             <EmptyState title="No timeline events" description="Lifecycle events will appear here." />
           ) : (
-            timeline.data?.items.map((ev, i) => (
-              <TimelineEventItem
-                key={`${ev.event_type}-${ev.occurred_at}-${i}`}
-                eventType={ev.event_type}
-                title={ev.title}
-                occurredAt={ev.occurred_at}
-                details={ev.details}
-              />
+            timelineGroups.map((group) => (
+              <div key={group.day} className="space-y-3">
+                <h3 className="text-sm font-semibold text-muted-foreground">
+                  {formatDayHeader(group.day)}
+                </h3>
+                <div className="space-y-2">
+                  {group.items.map((ev, i) => (
+                    <TimelineEventItem
+                      key={`${ev.event_type}-${ev.occurred_at}-${i}`}
+                      eventType={ev.event_type}
+                      title={ev.title}
+                      occurredAt={ev.occurred_at}
+                      details={ev.details}
+                    />
+                  ))}
+                </div>
+              </div>
             ))
           )}
           {timeline.data ? (
@@ -253,6 +333,14 @@ export function AssetDetailPageContent() {
 
       {tab === "health" ? (
         <>
+          <Card>
+            <CardContent className="pt-6">
+              <HealthTrendChart
+                items={health.data?.items ?? []}
+                predictedScore={predictedHealthScore}
+              />
+            </CardContent>
+          </Card>
           <EntityDataTable
             columns={healthColumns}
             data={health.data?.items ?? []}

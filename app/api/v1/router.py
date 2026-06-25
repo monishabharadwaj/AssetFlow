@@ -3,10 +3,12 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     allocations,
     assets,
+    assistant,
     dashboard,
     departments,
     employees,
     health_history,
+    intelligence,
     lookups,
     maintenance,
     timeline,
@@ -24,3 +26,5 @@ api_router.include_router(maintenance.router, tags=["Maintenance"])
 api_router.include_router(health_history.router, tags=["Asset Health History"])
 api_router.include_router(dashboard.router, tags=["Dashboard"])
 api_router.include_router(timeline.router, tags=["Asset Timeline"])
+api_router.include_router(intelligence.router, tags=["Intelligence"])
+api_router.include_router(assistant.router, tags=["Assistant"])

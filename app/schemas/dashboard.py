@@ -20,7 +20,21 @@ class RecentActivityItem(BaseModel):
     activity_type: str
     occurred_at: datetime
     asset_id: str
+    asset_tag: str = ""
+    asset_name: str = ""
+    headline: str = ""
     message: str
+
+
+class AttentionItem(BaseModel):
+    priority: str
+    item_type: str
+    asset_id: str
+    asset_tag: str
+    asset_name: str = ""
+    headline: str = ""
+    message: str
+    occurred_at: datetime | None = None
 
 
 class DashboardSummaryResponse(BaseModel):
@@ -34,3 +48,4 @@ class DashboardSummaryResponse(BaseModel):
     assets_by_department: list[DepartmentAssetBreakdownItem]
     maintenance_due_count: int
     recent_activity: list[RecentActivityItem]
+    attention_items: list[AttentionItem] = []

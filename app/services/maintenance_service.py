@@ -12,6 +12,8 @@ from app.schemas.maintenance import (
     MaintenanceListResponse,
     MaintenanceResponse,
     MaintenanceUpdate,
+    MaintenanceWorkQueueItem,
+    MaintenanceWorkQueueResponse,
 )
 from app.services.asset_service import AssetService
 
@@ -66,6 +68,29 @@ class MaintenanceService:
         items, total = self.repository.list_by_asset(asset_id, page=page, page_size=page_size)
         return PaginatedResponse.create(
             items=[MaintenanceResponse.model_validate(item) for item in items],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    def list_work_queue(
+        self,
+        *,
+        page: int,
+        page_size: int,
+    ) -> PaginatedResponse[MaintenanceWorkQueueItem]:
+        rows, total = self.repository.list_due(page=page, page_size=page_size)
+        items = [
+            MaintenanceWorkQueueItem(
+                record=MaintenanceResponse.model_validate(record),
+                asset_id=asset.id,
+                asset_tag=asset.asset_tag,
+                asset_name=asset.name,
+            )
+            for record, asset in rows
+        ]
+        return PaginatedResponse.create(
+            items=items,
             total=total,
             page=page,
             page_size=page_size,

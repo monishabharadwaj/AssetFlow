@@ -8,10 +8,20 @@ from app.schemas.maintenance import (
     MaintenanceListResponse,
     MaintenanceResponse,
     MaintenanceUpdate,
+    MaintenanceWorkQueueResponse,
 )
 from app.services.maintenance_service import MaintenanceService
 
 router = APIRouter()
+
+
+@router.get("/maintenance", response_model=MaintenanceWorkQueueResponse)
+def list_maintenance_work_queue(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    service: MaintenanceService = Depends(get_maintenance_service),
+) -> MaintenanceWorkQueueResponse:
+    return service.list_work_queue(page=page, page_size=page_size)
 
 
 @router.post(

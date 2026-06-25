@@ -46,7 +46,20 @@ export type DashboardSummary = {
     activity_type: string;
     occurred_at: string;
     asset_id: string;
+    asset_tag: string;
+    asset_name: string;
+    headline: string;
     message: string;
+  }>;
+  attention_items: Array<{
+    priority: string;
+    item_type: string;
+    asset_id: string;
+    asset_tag: string;
+    asset_name: string;
+    headline: string;
+    message: string;
+    occurred_at: string | null;
   }>;
 };
 

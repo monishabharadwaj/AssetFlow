@@ -4,7 +4,7 @@ from datetime import date
 
 from sqlalchemy import func, select
 
-from app.core.enums import MaintenanceStatus
+from app.core.enums import AssetStatus, MaintenanceStatus
 from app.models.allocation import AssetAllocation
 from app.models.asset import Asset
 from app.models.department import Department
@@ -87,6 +87,90 @@ class DashboardRepository(BaseRepository[Asset]):
         stmt = (
             select(MaintenanceRecord)
             .order_by(MaintenanceRecord.updated_at.desc())
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
+    def maintenance_due_items(self, limit: int = 10) -> list[tuple[MaintenanceRecord, Asset]]:
+        stmt = (
+            select(MaintenanceRecord, Asset)
+            .join(Asset, Asset.id == MaintenanceRecord.asset_id)
+            .where(
+                MaintenanceRecord.status.in_(
+                    [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
+                ),
+                MaintenanceRecord.scheduled_date.is_not(None),
+                MaintenanceRecord.scheduled_date <= date.today(),
+            )
+            .order_by(MaintenanceRecord.scheduled_date.asc())
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).all())
+
+    def assets_in_maintenance(self, limit: int = 10) -> list[Asset]:
+        stmt = (
+            select(Asset)
+            .where(
+                Asset.is_active.is_(True),
+                Asset.current_status == AssetStatus.IN_MAINTENANCE,
+            )
+            .order_by(Asset.updated_at.desc())
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
+    def assets_by_type(self) -> list[tuple[str, int]]:
+        from app.models.asset import AssetType
+
+        stmt = (
+            select(AssetType.name, func.count(Asset.id))
+            .join(Asset, Asset.asset_type_id == AssetType.id)
+            .where(Asset.is_active.is_(True))
+            .group_by(AssetType.name)
+            .order_by(func.count(Asset.id).desc(), AssetType.name)
+        )
+        return [(name, count) for name, count in self.db.execute(stmt).all()]
+
+    def count_assets_by_type_name(self, type_name: str) -> int:
+        from app.models.asset import AssetType
+
+        stmt = (
+            select(func.count())
+            .select_from(Asset)
+            .join(AssetType, Asset.asset_type_id == AssetType.id)
+            .where(Asset.is_active.is_(True), AssetType.name.ilike(type_name))
+        )
+        return self.db.execute(stmt).scalar_one()
+
+    def warranty_expiring_soon(self, *, within_days: int = 30, limit: int = 10) -> list[Asset]:
+        from datetime import timedelta
+
+        cutoff = date.today() + timedelta(days=within_days)
+        stmt = (
+            select(Asset)
+            .where(
+                Asset.is_active.is_(True),
+                Asset.warranty_expiry.is_not(None),
+                Asset.warranty_expiry <= cutoff,
+                Asset.warranty_expiry >= date.today(),
+            )
+            .order_by(Asset.warranty_expiry.asc())
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
+    def available_assignable_laptops(self, limit: int = 5) -> list[Asset]:
+        from app.models.asset import AssetType
+
+        stmt = (
+            select(Asset)
+            .join(AssetType, Asset.asset_type_id == AssetType.id)
+            .where(
+                Asset.is_active.is_(True),
+                Asset.current_status == AssetStatus.AVAILABLE,
+                AssetType.name.in_(["Laptop", "Desktop Workstation"]),
+            )
+            .order_by(Asset.updated_at.desc())
             .limit(limit)
         )
         return list(self.db.execute(stmt).scalars().all())

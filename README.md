@@ -155,6 +155,54 @@ The API currently allows local frontend origins:
 
 Configured in `app/main.py`.
 
-## Next Phase
+## Seed Data (Phase 5.5)
 
-Phase 4B: add dashboard summary and unified asset timeline APIs to support a premium frontend experience before React implementation.
+Reproducible demo datasets for development and FYP demonstrations:
+
+```bash
+py -m alembic upgrade head
+py -m app.seeding --profile demo --reset
+```
+
+| Profile | Assets | History | Use |
+|---------|--------|---------|-----|
+| `minimal` | 30 | 30 days | Quick dev / CI |
+| `demo` | 200 active + 20 inactive | 18 months | Default — Operations Center + FYP |
+| `ml` | 200 | 18 months + dense health | FT-Transformer prep |
+
+The demo profile includes fixed asset tags for walkthroughs: `IT-LAP-0001`, `OPS-VAN-001`, `SRV-PROD-01`, `ADM-PRT-001`. See [DEMO.md](DEMO.md).
+
+## Frontend (Phases 5A–6A)
+
+A frontend workspace is available at `frontend/` with:
+
+- React + TypeScript + Vite
+- TanStack Query provider with toast notifications
+- App shell with sidebar/header/breadcrumb routing
+- **Operations Center** — attention queue, live activity feed, compact metrics, charts
+- **Assets** — search, filters, CRUD, URL-driven params
+- **Asset Detail** — hero, tabs, lifecycle actions, timeline
+- **Maintenance Center** — assets in maintenance + due count
+- **Departments & Employees** — CRUD + allocation history
+
+See [DEMO.md](DEMO.md) for a 5-minute walkthrough script.
+
+Run locally (backend and frontend together):
+
+```bash
+# Terminal 1 — backend
+py -m uvicorn app.main:app --reload
+
+# Terminal 2 — frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173/dashboard`. Optional: copy `frontend/.env.example` to `frontend/.env` to override `VITE_API_BASE_URL`.
+
+**Dev tips (Windows):**
+
+- Frontend must run on port **5173** (`strictPort: true` in Vite config). If port 5173 is busy, stop other Node processes: `taskkill /F /IM node.exe`, then restart `npm run dev`.
+- Vite cache is stored outside OneDrive (`%TEMP%\vite-cache-assetflow`) to avoid file-lock errors.
+- Backend CORS allows localhost ports 5173, 5174, and 3000.
