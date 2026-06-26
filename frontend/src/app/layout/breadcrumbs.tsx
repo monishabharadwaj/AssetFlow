@@ -25,12 +25,12 @@ export function Breadcrumbs() {
   });
 
   if (segments.length === 0) {
-    return <p className="text-sm text-muted-foreground">Home</p>;
+    return <p className="text-sm text-zinc-300">Home</p>;
   }
 
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
-      <Link to="/dashboard" className="text-muted-foreground hover:text-foreground">
+      <Link to="/dashboard" className="text-zinc-400 transition-colors hover:text-amber-200">
         Home
       </Link>
       {segments.map((segment, index) => {
@@ -41,11 +41,11 @@ export function Breadcrumbs() {
 
         return (
           <span key={path} className="flex items-center gap-2">
-            <span className="text-muted-foreground">/</span>
+            <span className="text-zinc-500">/</span>
             {isLast ? (
-              <span className="font-medium text-foreground">{label}</span>
+              <span className="font-semibold text-white">{label}</span>
             ) : (
-              <Link to={path} className="text-muted-foreground hover:text-foreground">
+              <Link to={path} className="text-zinc-400 transition-colors hover:text-amber-200">
                 {label}
               </Link>
             )}

@@ -20,14 +20,16 @@
     "react-hook-form": "^7.79.0",
     "react-router-dom": "^7.18.0",
     "recharts": "^3.8.1",
+    "styled-components": "^6.4.3",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^25.9.4",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "@types/styled-components": "^5.1.36",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.15",
