@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import httpx
 
 from app.core.config import settings
 from app.schemas.assistant import AssistantChatRequest, AssistantChatResponse, AssistantSource
 from app.services import narrative as narr
 from app.services.assistant_tools import AssistantTools
+
+_OLLAMA_FORMAT_TIMEOUT_SECONDS = 35.0
 
 
 class AssistantService:
@@ -14,13 +17,13 @@ class AssistantService:
 
     async def chat(self, request: AssistantChatRequest) -> AssistantChatResponse:
         message = request.message.strip()
-        tools_used: list[str] = []
-        sources: list[AssistantSource] = []
+        tool_result, tool_name = await asyncio.to_thread(self._route_tools, message)
 
-        tool_result, tool_name = self._route_tools(message)
+        tools_used: list[str] = []
         if tool_name:
             tools_used.append(tool_name)
 
+        sources: list[AssistantSource] = []
         if tool_result.get("sources"):
             for s in tool_result["sources"]:
                 sources.append(AssistantSource(**s))
@@ -36,8 +39,11 @@ class AssistantService:
 
         if settings.assistant_use_ollama:
             try:
-                answer = await self._ollama_format(message, tool_result)
-            except Exception:
+                answer = await asyncio.wait_for(
+                    self._ollama_format(message, tool_result),
+                    timeout=min(settings.ollama_timeout_seconds, _OLLAMA_FORMAT_TIMEOUT_SECONDS),
+                )
+            except (asyncio.TimeoutError, Exception):
                 answer = fallback
         else:
             answer = fallback

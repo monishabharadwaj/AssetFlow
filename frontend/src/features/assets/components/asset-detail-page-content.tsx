@@ -25,10 +25,17 @@ import {
   useAssetTimeline,
   useAssetTransfers,
 } from "../hooks/use-lifecycle";
-import { useAssetRecommendations, usePredictHealth, useRunPrediction } from "../../intelligence/hooks/use-intelligence";
+import {
+  useAssetRecommendations,
+  usePredictHealth,
+  useRunPrediction,
+  useAssetRootCause,
+} from "../../intelligence/hooks/use-intelligence";
 import { AssetShowcaseCard } from "./asset-showcase-card";
 import { HealthTrendChart } from "./health-trend-chart";
+import { AssetHealthReport } from "./asset-health-report";
 import { LifecycleActionSheets } from "./lifecycle-action-sheets";
+
 
 const TABS = ["overview", "timeline", "allocations", "transfers", "maintenance", "health"] as const;
 type Tab = (typeof TABS)[number];
@@ -58,6 +65,9 @@ export function AssetDetailPageContent() {
   const prediction = usePredictHealth(assetId);
   const runPrediction = useRunPrediction(assetId);
   const assetRecommendations = useAssetRecommendations(assetId);
+  const [explainLlm, setExplainLlm] = useState(false);
+  const rootCause = useAssetRootCause(assetId, explainLlm, tab === "health");
+
 
   const departmentMap = useMemo(
     () => new Map((departmentsData?.items ?? []).map((d) => [d.id, d.name])),
@@ -333,6 +343,19 @@ export function AssetDetailPageContent() {
 
       {tab === "health" ? (
         <>
+          <AssetHealthReport
+            assetName={asset.name}
+            prediction={prediction.data ?? null}
+            explanationSummary={rootCause.data?.root_cause_summary ?? null}
+            enterpriseBrief={rootCause.data?.enterprise_brief ?? null}
+            rootCause={rootCause.data ?? null}
+            isExplainLoading={rootCause.isLoading || rootCause.isFetching}
+            factors={rootCause.data?.factors ?? []}
+            onExplain={() => {
+              setExplainLlm(true);
+              void rootCause.refetch();
+            }}
+          />
           <Card>
             <CardContent className="pt-6">
               <HealthTrendChart

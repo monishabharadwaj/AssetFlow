@@ -37,3 +37,25 @@ class HealthHistoryRepository(BaseRepository[AssetHealthHistory]):
         )
         items = list(self.db.execute(stmt).scalars().all())
         return items, total
+
+    def get_latest_for_asset(self, asset_id: uuid.UUID) -> AssetHealthHistory | None:
+        stmt = (
+            select(AssetHealthHistory)
+            .where(AssetHealthHistory.asset_id == asset_id)
+            .order_by(AssetHealthHistory.recorded_at.desc())
+            .limit(1)
+        )
+        return self.db.execute(stmt).scalars().first()
+
+    def get_latest_prediction_for_asset(self, asset_id: uuid.UUID) -> AssetHealthHistory | None:
+        stmt = (
+            select(AssetHealthHistory)
+            .where(
+                AssetHealthHistory.asset_id == asset_id,
+                AssetHealthHistory.prediction_metadata.isnot(None),
+            )
+            .order_by(AssetHealthHistory.recorded_at.desc())
+            .limit(1)
+        )
+        return self.db.execute(stmt).scalars().first()
+

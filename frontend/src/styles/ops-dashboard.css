@@ -1,0 +1,50 @@
+/* Enterprise Operations Center — dark premium utilities */
+
+.glass-card {
+  background: hsl(224 24% 12% / 0.72);
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(224 18% 24% / 0.8);
+  box-shadow: 0 4px 24px hsl(224 40% 4% / 0.35);
+}
+
+.gradient-hero {
+  background:
+    radial-gradient(ellipse 80% 60% at 70% 20%, hsl(230 63% 53% / 0.12), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 10% 80%, hsl(160 60% 45% / 0.06), transparent 50%);
+}
+
+.kpi-glow-green {
+  box-shadow: 0 0 24px hsl(142 70% 45% / 0.12);
+}
+.kpi-glow-blue {
+  box-shadow: 0 0 24px hsl(217 90% 60% / 0.12);
+}
+.kpi-glow-amber {
+  box-shadow: 0 0 24px hsl(38 92% 50% / 0.12);
+}
+.kpi-glow-red {
+  box-shadow: 0 0 24px hsl(0 72% 51% / 0.15);
+}
+.kpi-glow-purple {
+  box-shadow: 0 0 24px hsl(270 60% 55% / 0.12);
+}
+.kpi-glow-cyan {
+  box-shadow: 0 0 24px hsl(190 90% 50% / 0.12);
+}
+
+.premium-kpi-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.premium-kpi-card:hover {
+  transform: translateY(-2px);
+}
+
+.ai-core-glow {
+  filter: drop-shadow(0 0 12px hsl(230 80% 65% / 0.45));
+}
+
+.attention-tab-active {
+  background: hsl(230 63% 53% / 0.15);
+  border-color: hsl(230 63% 53% / 0.4);
+  color: hsl(230 80% 75%);
+}

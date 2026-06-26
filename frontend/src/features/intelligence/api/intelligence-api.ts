@@ -92,3 +92,42 @@ export function fetchMaintenanceWorkQueue(page = 1, pageSize = 20) {
     pages: number;
   }>(`/maintenance?page=${page}&page_size=${pageSize}`);
 }
+
+export type ExplanationFactor = {
+  factor: string;
+  severity: "LOW" | "MEDIUM" | "HIGH";
+  message: string;
+};
+
+export type EnterpriseHealthBrief = {
+  what_happened: string;
+  why_predicted: string;
+  business_impact: string;
+  recommended_action: string;
+  priority: string;
+  estimated_downtime: string;
+  estimated_effort: string;
+  estimated_cost: string | null;
+  health_band: string;
+  confidence_label: string;
+  remaining_useful_life: string | null;
+  is_improvement: boolean;
+};
+
+export type RootCauseResponse = {
+  asset_id: string;
+  asset_tag: string | null;
+  asset_name: string | null;
+  health_score: number;
+  risk_level: string;
+  root_cause_summary: string;
+  source: string;
+  factors: ExplanationFactor[];
+  anomaly_detected: boolean;
+  enterprise_brief: EnterpriseHealthBrief | null;
+};
+
+export function fetchAssetRootCause(assetId: string, useLlm = true) {
+  return apiGet<RootCauseResponse>(`/intelligence/assets/${assetId}/root-cause?use_llm=${useLlm}`);
+}
+

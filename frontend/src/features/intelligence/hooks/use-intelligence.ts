@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "../../../shared/api/query-keys";
 import {
   fetchAssetRecommendations,
+  fetchAssetRootCause,
   fetchHighRiskAssets,
   fetchRecommendations,
   predictAssetHealth,
@@ -43,7 +44,7 @@ export function useAssetRecommendations(assetId: string) {
 export function useScoreBatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (persist?: boolean) => scoreBatch(persist),
+    mutationFn: (persist = true) => scoreBatch(persist),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
       void queryClient.invalidateQueries({ queryKey: ["intelligence"] });
@@ -54,10 +55,21 @@ export function useScoreBatch() {
 export function useRunPrediction(assetId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => predictAssetHealth(assetId, false),
+    mutationFn: () => predictAssetHealth(assetId, true),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["intelligence", "prediction", assetId] });
+      void queryClient.invalidateQueries({ queryKey: ["intelligence", "root-cause", assetId] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
     },
   });
 }
+
+export function useAssetRootCause(assetId: string, useLlm = true, enabled = true) {
+  return useQuery({
+    queryKey: ["intelligence", "root-cause", assetId, useLlm],
+    queryFn: () => fetchAssetRootCause(assetId, useLlm),
+    enabled: Boolean(assetId) && enabled,
+    retry: false,
+  });
+}
+

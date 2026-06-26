@@ -61,10 +61,25 @@ ML = SeedProfile(
     random_seed=42,
 )
 
+ENTERPRISE = SeedProfile(
+    name="enterprise",
+    departments=10,
+    employees=175,
+    active_assets=400,
+    inactive_assets=40,
+    history_months=24,
+    allocation_events=728,
+    transfer_events=180,
+    maintenance_records=550,
+    health_snapshots=3500,
+    random_seed=42,
+)
+
 PROFILES: dict[str, SeedProfile] = {
     "minimal": MINIMAL,
     "demo": DEMO,
     "ml": ML,
+    "enterprise": ENTERPRISE,
 }
 
 

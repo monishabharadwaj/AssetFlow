@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     intelligence,
     lookups,
     maintenance,
+    operations,
     timeline,
     transfers,
 )
@@ -28,3 +29,5 @@ api_router.include_router(dashboard.router, tags=["Dashboard"])
 api_router.include_router(timeline.router, tags=["Asset Timeline"])
 api_router.include_router(intelligence.router, tags=["Intelligence"])
 api_router.include_router(assistant.router, tags=["Assistant"])
+api_router.include_router(operations.router, tags=["Operations"])
+

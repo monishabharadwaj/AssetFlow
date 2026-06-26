@@ -2,7 +2,12 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query
 
-from app.api.deps import get_prediction_service, get_recommendation_service
+from app.api.deps import (
+    get_prediction_service,
+    get_recommendation_service,
+    get_root_cause_service,
+)
+from app.schemas.explanation import RootCauseResponse
 from app.schemas.intelligence import (
     BatchScoreResponse,
     HealthPredictionResponse,
@@ -11,6 +16,8 @@ from app.schemas.intelligence import (
 from app.schemas.recommendation import RecommendationListResponse
 from app.services.prediction_service import PredictionService, get_prediction_cache
 from app.services.recommendation_service import RecommendationService
+from app.services.root_cause_service import RootCauseService
+
 
 router = APIRouter()
 
@@ -69,3 +76,16 @@ def list_asset_recommendations(
     service: RecommendationService = Depends(get_recommendation_service),
 ) -> RecommendationListResponse:
     return service.list_for_asset(asset_id, limit=limit)
+
+
+@router.get(
+    "/intelligence/assets/{asset_id}/root-cause",
+    response_model=RootCauseResponse,
+)
+async def get_asset_root_cause(
+    asset_id: uuid.UUID,
+    use_llm: bool = Query(default=True),
+    service: RootCauseService = Depends(get_root_cause_service),
+) -> RootCauseResponse:
+    return await service.get_root_cause(asset_id, use_llm=use_llm)
+

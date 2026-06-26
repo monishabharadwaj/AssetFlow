@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import joinedload, load_only, noload
 
 from app.core.enums import AssetStatus, MaintenanceStatus
 from app.models.allocation import AssetAllocation
@@ -12,6 +13,33 @@ from app.models.employee import Employee
 from app.models.maintenance import MaintenanceRecord
 from app.models.transfer import AssetTransfer
 from app.repositories.base import BaseRepository
+
+
+def _asset_feed_options():
+    return (
+        noload(Asset.allocations),
+        noload(Asset.transfers),
+        noload(Asset.maintenance_records),
+        noload(Asset.health_history),
+        noload(Asset.asset_type),
+        noload(Asset.current_department),
+        noload(Asset.current_assigned_employee),
+    )
+
+
+def _department_feed_options():
+    return (
+        noload(Department.employees),
+        noload(Department.assets),
+    )
+
+
+def _employee_feed_options():
+    return (
+        noload(Employee.assigned_assets),
+        noload(Employee.allocations),
+        noload(Employee.department),
+    )
 
 
 class DashboardRepository(BaseRepository[Asset]):
@@ -70,31 +98,59 @@ class DashboardRepository(BaseRepository[Asset]):
     def recent_allocations(self, limit: int) -> list[AssetAllocation]:
         stmt = (
             select(AssetAllocation)
+            .options(
+                joinedload(AssetAllocation.asset)
+                .load_only(Asset.id, Asset.asset_tag, Asset.name)
+                .options(*_asset_feed_options()),
+                joinedload(AssetAllocation.employee)
+                .load_only(Employee.id, Employee.first_name, Employee.last_name)
+                .options(*_employee_feed_options()),
+            )
             .order_by(AssetAllocation.allocated_at.desc())
             .limit(limit)
         )
-        return list(self.db.execute(stmt).scalars().all())
+        return list(self.db.execute(stmt).scalars().unique().all())
 
     def recent_transfers(self, limit: int) -> list[AssetTransfer]:
         stmt = (
             select(AssetTransfer)
+            .options(
+                joinedload(AssetTransfer.asset)
+                .load_only(Asset.id, Asset.asset_tag, Asset.name)
+                .options(*_asset_feed_options()),
+                joinedload(AssetTransfer.to_department)
+                .load_only(Department.id, Department.name)
+                .options(*_department_feed_options()),
+                joinedload(AssetTransfer.from_department)
+                .load_only(Department.id, Department.name)
+                .options(*_department_feed_options()),
+            )
             .order_by(AssetTransfer.transferred_at.desc())
             .limit(limit)
         )
-        return list(self.db.execute(stmt).scalars().all())
+        return list(self.db.execute(stmt).scalars().unique().all())
 
     def recent_maintenance(self, limit: int) -> list[MaintenanceRecord]:
         stmt = (
             select(MaintenanceRecord)
+            .options(
+                joinedload(MaintenanceRecord.asset)
+                .load_only(Asset.id, Asset.asset_tag, Asset.name, Asset.updated_at)
+                .options(*_asset_feed_options()),
+            )
             .order_by(MaintenanceRecord.updated_at.desc())
             .limit(limit)
         )
-        return list(self.db.execute(stmt).scalars().all())
+        return list(self.db.execute(stmt).scalars().unique().all())
 
     def maintenance_due_items(self, limit: int = 10) -> list[tuple[MaintenanceRecord, Asset]]:
         stmt = (
-            select(MaintenanceRecord, Asset)
-            .join(Asset, Asset.id == MaintenanceRecord.asset_id)
+            select(MaintenanceRecord)
+            .options(
+                joinedload(MaintenanceRecord.asset)
+                .load_only(Asset.id, Asset.asset_tag, Asset.name)
+                .options(*_asset_feed_options()),
+            )
             .where(
                 MaintenanceRecord.status.in_(
                     [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
@@ -105,11 +161,13 @@ class DashboardRepository(BaseRepository[Asset]):
             .order_by(MaintenanceRecord.scheduled_date.asc())
             .limit(limit)
         )
-        return list(self.db.execute(stmt).all())
+        records = self.db.execute(stmt).scalars().all()
+        return [(r, r.asset) for r in records]
 
     def assets_in_maintenance(self, limit: int = 10) -> list[Asset]:
         stmt = (
             select(Asset)
+            .options(*_asset_feed_options())
             .where(
                 Asset.is_active.is_(True),
                 Asset.current_status == AssetStatus.IN_MAINTENANCE,
@@ -165,6 +223,7 @@ class DashboardRepository(BaseRepository[Asset]):
         stmt = (
             select(Asset)
             .join(AssetType, Asset.asset_type_id == AssetType.id)
+            .options(*_asset_feed_options())
             .where(
                 Asset.is_active.is_(True),
                 Asset.current_status == AssetStatus.AVAILABLE,

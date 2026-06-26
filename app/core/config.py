@@ -26,5 +26,11 @@ class Settings(BaseSettings):
     assistant_enabled: bool = True
     assistant_use_ollama: bool = False
 
+    drift_min_drop: float = 0.10
+    drift_severe_drop: float = 0.15
+    drift_healthy_floor: float = 0.75
+    drift_notify_below: float = 0.60
+
+
 
 settings = Settings()

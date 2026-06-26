@@ -51,22 +51,23 @@ class AssistantTools:
         }
 
     def get_dashboard_summary(self) -> dict:
-        summary = self.dashboard.get_summary()
-        top_dept = summary.assets_by_department[0] if summary.assets_by_department else None
+        total_active_assets = self.dashboard_repo.count_assets(active_only=True)
+        total_active_employees = self.dashboard_repo.count_employees(active_only=True)
+        maintenance_due_count = self.dashboard_repo.maintenance_due_count()
+        dept_rows = self.dashboard_repo.assets_by_department()
+        top_dept = dept_rows[0] if dept_rows else None
         fallback = narr.dashboard_overview_narrative(
-            total_active_assets=summary.total_active_assets,
-            total_active_employees=summary.total_active_employees,
-            maintenance_due_count=summary.maintenance_due_count,
-            top_department=top_dept.department_name if top_dept else None,
-            top_department_count=top_dept.count if top_dept else None,
+            total_active_assets=total_active_assets,
+            total_active_employees=total_active_employees,
+            maintenance_due_count=maintenance_due_count,
+            top_department=top_dept[1] if top_dept else None,
+            top_department_count=top_dept[2] if top_dept else None,
         )
-        dept_lines = [
-            f"{d.department_name}: {d.count}" for d in summary.assets_by_department[:5]
-        ]
+        dept_lines = [f"{name}: {count}" for _, name, count in dept_rows[:5]]
         data_text = (
-            f"Total assets: {summary.total_active_assets}. "
-            f"Employees: {summary.total_active_employees}. "
-            f"Maintenance due: {summary.maintenance_due_count}. "
+            f"Total assets: {total_active_assets}. "
+            f"Employees: {total_active_employees}. "
+            f"Maintenance due: {maintenance_due_count}. "
             f"Top departments: {'; '.join(dept_lines)}."
         )
         return {
@@ -76,13 +77,16 @@ class AssistantTools:
         }
 
     def get_fleet_counts(self, message: str = "") -> dict:
-        summary = self.dashboard.get_summary()
+        total_active_assets = self.dashboard_repo.count_assets(active_only=True)
+        total_active_employees = self.dashboard_repo.count_employees(active_only=True)
+        total_active_departments = self.dashboard_repo.count_departments(active_only=True)
+        maintenance_due_count = self.dashboard_repo.maintenance_due_count()
         lower = message.lower()
         bullets = [
-            narr.fleet_count_bullet("active assets", summary.total_active_assets),
-            narr.fleet_count_bullet("active employees", summary.total_active_employees),
-            narr.fleet_count_bullet("departments", summary.total_active_departments),
-            narr.fleet_count_bullet("overdue maintenance items", summary.maintenance_due_count),
+            narr.fleet_count_bullet("active assets", total_active_assets),
+            narr.fleet_count_bullet("active employees", total_active_employees),
+            narr.fleet_count_bullet("departments", total_active_departments),
+            narr.fleet_count_bullet("overdue maintenance items", maintenance_due_count),
         ]
 
         matched_type: str | None = None
@@ -216,9 +220,8 @@ class AssistantTools:
         }
 
     def get_recent_transfers(self) -> dict:
-        summary = self.dashboard.get_summary()
-        transfers = [a for a in summary.recent_activity if a.activity_type == "TRANSFER"][:5]
-        if not transfers:
+        rows = self.dashboard_repo.recent_transfers(limit=5)
+        if not rows:
             return {
                 "data_text": "No recent transfers found.",
                 "fallback_answer": narr.format_assistant_reply(
@@ -228,13 +231,20 @@ class AssistantTools:
                 "sources": [],
             }
 
-        bullets = [
-            narr.transfer_bullet(headline=a.headline, asset_tag=a.asset_tag) for a in transfers
-        ]
-        sources = [
-            {"label": a.asset_tag, "asset_id": a.asset_id, "url": f"/assets/{a.asset_id}?tab=timeline"}
-            for a in transfers
-        ]
+        bullets = []
+        sources = []
+        for row in rows:
+            asset = row.asset
+            to_name = row.to_department.name
+            headline = f"{asset.name} transferred to {to_name}"
+            bullets.append(narr.transfer_bullet(headline=headline, asset_tag=asset.asset_tag))
+            sources.append(
+                {
+                    "label": asset.asset_tag,
+                    "asset_id": str(row.asset_id),
+                    "url": f"/assets/{row.asset_id}?tab=timeline",
+                }
+            )
         return {
             "data_text": "; ".join(bullets),
             "fallback_answer": narr.format_assistant_reply("Recent transfers:", bullets),

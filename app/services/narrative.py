@@ -260,3 +260,110 @@ def fleet_count_bullet(label: str, count: int) -> str:
 
 def warranty_expiring_bullet(*, asset_name: str, asset_tag: str, expiry: date) -> str:
     return f"{asset_name} — warranty expires {expiry.isoformat()} ({asset_tag})"
+
+
+def explanation_factor_message(factor: str, value: str, severity: str) -> str:
+    templates = {
+        "health_drop": f"Health score dropped significantly: {value}.",
+        "risk_escalation": f"Risk level escalated to {value}.",
+        "failure_count": f"High failure count detected: {value} failures.",
+        "maintenance_overdue": f"Maintenance is overdue by {value} days.",
+        "high_utilization": f"Asset utilization is very high: {value}.",
+        "elevated_downtime": f"Asset experienced elevated downtime of {value}.",
+        "asset_age": f"Asset age is high: {value} days.",
+    }
+    return templates.get(factor, f"Critical factor: {factor} ({value})")
+
+
+def health_band_from_score(health_score: float) -> tuple[str, str]:
+    pct = int(health_score * 100)
+    if pct >= 90:
+        return "EXCELLENT", "Excellent"
+    if pct >= 75:
+        return "HEALTHY", "Healthy"
+    if pct >= 60:
+        return "MONITOR", "Monitor"
+    if pct >= 45:
+        return "WARNING", "Warning"
+    return "CRITICAL", "Critical"
+
+
+def enterprise_health_brief(
+    *,
+    asset_name: str,
+    asset_type: str,
+    health_pct: int,
+    health_band_label: str,
+    risk_level: str,
+    factors: list[str],
+    days_since_maint: int,
+    failure_count: int,
+    health_delta: float | None,
+    age_days: int,
+    expected_life_days: int,
+) -> dict:
+    is_improvement = health_delta is not None and health_delta > 0
+    confidence_label = "High Confidence" if risk_level in ("LOW", "HIGH") else "Moderate Confidence"
+    
+    remaining_days = expected_life_days - age_days
+    if remaining_days <= 0:
+        remaining_useful_life = "Expired (End of Life)"
+    elif remaining_days < 30:
+        remaining_useful_life = f"{remaining_days} days"
+    elif remaining_days < 365:
+        remaining_useful_life = f"{remaining_days // 30} months"
+    else:
+        remaining_useful_life = f"{remaining_days / 365:.1f} years"
+
+    # Business impact mapping
+    if risk_level == "HIGH":
+        business_impact = f"Imminent failure risk for {asset_name}. Operation could be disrupted, causing downtime for users."
+        recommended_action = "Schedule immediate servicing. Inspect hardware, check diagnostic logs, and replace worn-out components."
+        estimated_downtime = "4 - 8 hours"
+        estimated_effort = "High (Specialist required)"
+        estimated_cost = "$250 - $500"
+    elif risk_level == "MEDIUM":
+        business_impact = f"Elevated warning state. Performance issues or intermittent faults may occur, leading to reduced productivity."
+        recommended_action = "Schedule preventive check within 14 days. Review utilization metrics and check recent maintenance logs."
+        estimated_downtime = "1 - 2 hours"
+        estimated_effort = "Medium (Standard service)"
+        estimated_cost = "$50 - $150"
+    else:
+        business_impact = "Normal operations. Asset is performing within baseline parameters with low probability of failure."
+        recommended_action = "No immediate action required. Continue regular scheduling cycle and standard health scans."
+        estimated_downtime = "None"
+        estimated_effort = "Low (Routine inspection)"
+        estimated_cost = "$0"
+
+    what_happened = f"The {asset_name} is currently flagged as {health_band_label} with an overall health score of {health_pct}%."
+    
+    if factors:
+        why_predicted = f"Assessment is driven by: {'; '.join(factors)}."
+    else:
+        why_predicted = "No critical anomalous factors detected. Health is within normal baseline parameters."
+
+    return {
+        "what_happened": what_happened,
+        "why_predicted": why_predicted,
+        "business_impact": business_impact,
+        "recommended_action": recommended_action,
+        "priority": risk_level,
+        "estimated_downtime": estimated_downtime,
+        "estimated_effort": estimated_effort,
+        "estimated_cost": estimated_cost,
+        "health_band": health_band_label,
+        "confidence_label": confidence_label,
+        "remaining_useful_life": remaining_useful_life,
+        "is_improvement": is_improvement,
+    }
+
+
+def enterprise_explanation_summary(
+    *,
+    asset_name: str,
+    health_pct: int,
+    health_band_label: str,
+    is_improvement: bool,
+) -> str:
+    direction = "improving" if is_improvement else "declining"
+    return f"{asset_name} health score is {health_pct}% ({health_band_label} band), showing a {direction} trend."
