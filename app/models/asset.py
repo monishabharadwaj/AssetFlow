@@ -37,7 +37,7 @@ class AssetCategory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     asset_types: Mapped[list["AssetType"]] = relationship(
         back_populates="category",
-        lazy="selectin",
+        lazy="select",
     )
 
 
@@ -58,11 +58,11 @@ class AssetType(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     category: Mapped["AssetCategory"] = relationship(
         back_populates="asset_types",
-        lazy="joined",
+        lazy="select",
     )
     assets: Mapped[list["Asset"]] = relationship(
         back_populates="asset_type",
-        lazy="selectin",
+        lazy="select",
     )
 
 
@@ -113,33 +113,33 @@ class Asset(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     asset_type: Mapped["AssetType"] = relationship(
         back_populates="assets",
-        lazy="joined",
+        lazy="select",
     )
     current_department: Mapped["Department"] = relationship(
         back_populates="assets",
-        lazy="joined",
+        lazy="select",
     )
     current_assigned_employee: Mapped["Employee | None"] = relationship(
         back_populates="assigned_assets",
-        lazy="joined",
+        lazy="select",
     )
     allocations: Mapped[list["AssetAllocation"]] = relationship(
         back_populates="asset",
-        lazy="selectin",
+        lazy="select",
         order_by="AssetAllocation.allocated_at",
     )
     transfers: Mapped[list["AssetTransfer"]] = relationship(
         back_populates="asset",
-        lazy="selectin",
+        lazy="select",
         order_by="AssetTransfer.transferred_at",
     )
     maintenance_records: Mapped[list["MaintenanceRecord"]] = relationship(
         back_populates="asset",
-        lazy="selectin",
+        lazy="select",
         order_by="MaintenanceRecord.scheduled_date",
     )
     health_history: Mapped[list["AssetHealthHistory"]] = relationship(
         back_populates="asset",
-        lazy="selectin",
+        lazy="select",
         order_by="AssetHealthHistory.recorded_at",
     )

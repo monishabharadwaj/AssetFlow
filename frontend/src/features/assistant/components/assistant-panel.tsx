@@ -49,7 +49,13 @@ export function AssistantPanel({ open, onOpenChange }: AssistantPanelProps) {
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const chat = useMutation({
-    mutationFn: assistantChat,
+    mutationFn: (variables: string) => {
+      const formattedHistory = history.map((item) => ({
+        role: item.role,
+        content: item.text,
+      }));
+      return assistantChat({ message: variables, history: formattedHistory });
+    },
     onMutate: (variables) => {
       setHistory((prev) => [...prev, { role: "user", text: variables }]);
       setMessage("");

@@ -126,12 +126,6 @@ def get_dashboard_repository(db: Session = Depends(get_db)) -> DashboardReposito
     return DashboardRepository(db)
 
 
-def get_dashboard_service(
-    repository: DashboardRepository = Depends(get_dashboard_repository),
-) -> DashboardService:
-    return DashboardService(repository)
-
-
 def get_timeline_repository(db: Session = Depends(get_db)) -> TimelineRepository:
     return TimelineRepository(db)
 
@@ -154,6 +148,14 @@ def get_prediction_service(
     asset_repository: AssetRepository = Depends(get_asset_repository),
 ) -> PredictionService:
     return PredictionService(asset_service, feature_service, health_service, asset_repository)
+
+
+def get_dashboard_service(
+    repository: DashboardRepository = Depends(get_dashboard_repository),
+    prediction_service: PredictionService = Depends(get_prediction_service),
+) -> DashboardService:
+    prediction_service.is_cache_warm()
+    return DashboardService(repository)
 
 
 def get_recommendation_service(

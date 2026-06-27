@@ -66,8 +66,13 @@ export type AssistantChatResponse = {
   sources: Array<{ label: string; asset_id: string; url: string }>;
 };
 
-export function assistantChat(message: string) {
-  return apiPost<AssistantChatResponse>("/assistant/chat", { message });
+export type ChatHistoryItem = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export function assistantChat(data: { message: string; history: ChatHistoryItem[] }) {
+  return apiPost<AssistantChatResponse>("/assistant/chat", data);
 }
 
 export type MaintenanceWorkQueueItem = {

@@ -21,9 +21,9 @@ class Department(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     employees: Mapped[list["Employee"]] = relationship(
         back_populates="department",
-        lazy="selectin",
+        lazy="select",
     )
     assets: Mapped[list["Asset"]] = relationship(
         back_populates="current_department",
-        lazy="selectin",
+        lazy="select",
     )

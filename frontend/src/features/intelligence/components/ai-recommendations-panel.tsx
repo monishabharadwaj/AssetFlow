@@ -26,7 +26,7 @@ function priorityBadgeClass(priority: MaintenanceRecommendation["priority"]) {
 export function AiRecommendationsPanel() {
   const [showAll, setShowAll] = useState(false);
   const fetchLimit = showAll ? 50 : DISPLAY_LIMIT;
-  const { data, isLoading } = useRecommendations(fetchLimit);
+  const { data, isLoading, isError, error } = useRecommendations(fetchLimit);
   const scoreBatch = useScoreBatch();
 
   const visibleItems = data?.items ?? [];
@@ -58,7 +58,12 @@ export function AiRecommendationsPanel() {
         </Button>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isError ? (
+          <div className="rounded-md bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+            <p className="font-semibold mb-1">Failed to load AI recommendations</p>
+            <p>{error instanceof Error ? error.message : "An unexpected error occurred."}</p>
+          </div>
+        ) : isLoading ? (
           <p className="text-sm text-muted-foreground">Loading recommendations…</p>
         ) : !data?.items.length ? (
           <p className="text-sm text-muted-foreground">

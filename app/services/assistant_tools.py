@@ -362,3 +362,43 @@ class AssistantTools:
             "fallback_answer": narr.assistant_capabilities_message(),
             "sources": [],
         }
+
+    def get_healthy_assets(self) -> dict:
+        if not self.predictions.is_cache_warm():
+            return self._scoring_required()
+
+        ranked = sorted(
+            [p for p in get_prediction_cache().values() if p.health_score >= 0.8],
+            key=lambda p: p.health_score,
+            reverse=True,
+        )[:5]
+
+        if not ranked:
+            ranked = sorted(get_prediction_cache().values(), key=lambda p: p.health_score, reverse=True)[:5]
+
+        if not ranked:
+            return {
+                "data_text": "No healthy assets found in the current scoring run.",
+                "fallback_answer": narr.format_assistant_reply(
+                    "I couldn't find health metrics for any assets. Please run AI scoring first.",
+                    [],
+                ),
+                "sources": [],
+            }
+
+        bullets = [
+            f"{p.asset_name or p.asset_tag} — health is excellent at {int(p.health_score * 100)}% ({p.asset_tag})"
+            for p in ranked
+        ]
+        sources = [
+            {"label": p.asset_tag or p.asset_id, "asset_id": p.asset_id, "url": f"/assets/{p.asset_id}"}
+            for p in ranked
+        ]
+        return {
+            "data_text": "; ".join(bullets),
+            "fallback_answer": narr.format_assistant_reply(
+                "These assets are in good condition with high predicted health:",
+                bullets,
+            ),
+            "sources": sources,
+        }

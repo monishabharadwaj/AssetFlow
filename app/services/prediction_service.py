@@ -150,15 +150,20 @@ class PredictionService:
         if cached is not None:
             return cached
         if self.health_service and self.health_service.repository:
-            history = self.health_service.repository.get_latest_prediction_for_asset(asset_id)
-            if history and history.prediction_metadata:
-                meta = history.prediction_metadata
+            history = self.health_service.repository.get_latest_for_asset(asset_id)
+            if history:
+                from ml.data.schema import risk_level_from_score
+                health_score = float(history.health_score) if history.health_score is not None else 0.0
+                meta = history.prediction_metadata or {}
+                risk_level = meta.get("risk_level")
+                if not risk_level:
+                    risk_level = risk_level_from_score(health_score)
                 response = HealthPredictionResponse(
                     asset_id=str(history.asset_id),
                     asset_tag=history.asset.asset_tag if history.asset else None,
                     asset_name=history.asset.name if history.asset else None,
-                    health_score=float(history.health_score) if history.health_score is not None else 0.0,
-                    risk_level=RiskLevel(meta.get("risk_level", "LOW")),
+                    health_score=health_score,
+                    risk_level=RiskLevel(risk_level),
                     confidence=float(meta.get("confidence", 1.0)),
                     model_version=meta.get("model_version", "unknown"),
                     training_dataset=meta.get("training_dataset", "unknown"),
@@ -179,30 +184,41 @@ class PredictionService:
             return
         if not self.asset_repository or not self.health_service:
             return
+        from ml.data.schema import risk_level_from_score
+        
+        assets_map = {}
         page = 1
         while True:
-            assets, total = self.asset_repository.list(page=page, page_size=100, is_active=True)
+            assets, total = self.asset_repository.list(page=page, page_size=200, is_active=True)
             if not assets:
                 break
             for asset in assets:
-                history = self.health_service.repository.get_latest_prediction_for_asset(asset.id)
-                if history and history.prediction_metadata:
-                    meta = history.prediction_metadata
-                    response = HealthPredictionResponse(
-                        asset_id=str(history.asset_id),
-                        asset_tag=asset.asset_tag,
-                        asset_name=asset.name,
-                        health_score=float(history.health_score) if history.health_score is not None else 0.0,
-                        risk_level=RiskLevel(meta.get("risk_level", "LOW")),
-                        confidence=float(meta.get("confidence", 1.0)),
-                        model_version=meta.get("model_version", "unknown"),
-                        training_dataset=meta.get("training_dataset", "unknown"),
-                        features_used=meta.get("features_used", []),
-                        prediction_metadata=meta,
-                        predicted_at=history.recorded_at,
-                    )
-                    _PREDICTION_CACHE[str(asset.id)] = response
-            if page * 100 >= total:
+                assets_map[asset.id] = asset
+            if page * 200 >= total:
                 break
             page += 1
+
+        histories = self.health_service.repository.get_latest_for_all_assets()
+        for history in histories:
+            asset = assets_map.get(history.asset_id)
+            if asset:
+                health_score = float(history.health_score) if history.health_score is not None else 0.0
+                meta = history.prediction_metadata or {}
+                risk_level = meta.get("risk_level")
+                if not risk_level:
+                    risk_level = risk_level_from_score(health_score)
+                response = HealthPredictionResponse(
+                    asset_id=str(history.asset_id),
+                    asset_tag=asset.asset_tag,
+                    asset_name=asset.name,
+                    health_score=health_score,
+                    risk_level=RiskLevel(risk_level),
+                    confidence=float(meta.get("confidence", 1.0)),
+                    model_version=meta.get("model_version", "unknown"),
+                    training_dataset=meta.get("training_dataset", "unknown"),
+                    features_used=meta.get("features_used", []),
+                    prediction_metadata=meta,
+                    predicted_at=history.recorded_at,
+                )
+                _PREDICTION_CACHE[str(asset.id)] = response
 

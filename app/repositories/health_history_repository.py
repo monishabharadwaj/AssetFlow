@@ -59,3 +59,11 @@ class HealthHistoryRepository(BaseRepository[AssetHealthHistory]):
         )
         return self.db.execute(stmt).scalars().first()
 
+    def get_latest_for_all_assets(self) -> list[AssetHealthHistory]:
+        stmt = (
+            select(AssetHealthHistory)
+            .distinct(AssetHealthHistory.asset_id)
+            .order_by(AssetHealthHistory.asset_id, AssetHealthHistory.recorded_at.desc())
+        )
+        return list(self.db.execute(stmt).scalars().all())
+

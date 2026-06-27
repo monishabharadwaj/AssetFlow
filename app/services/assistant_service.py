@@ -4,7 +4,7 @@ import asyncio
 import httpx
 
 from app.core.config import settings
-from app.schemas.assistant import AssistantChatRequest, AssistantChatResponse, AssistantSource
+from app.schemas.assistant import AssistantChatRequest, AssistantChatResponse, AssistantSource, ChatMessage
 from app.services import narrative as narr
 from app.services.assistant_tools import AssistantTools
 
@@ -17,7 +17,19 @@ class AssistantService:
 
     async def chat(self, request: AssistantChatRequest) -> AssistantChatResponse:
         message = request.message.strip()
-        tool_result, tool_name = await asyncio.to_thread(self._route_tools, message)
+        history = request.history
+
+        # Heuristic for follow-up questions referencing history context.
+        # If the query contains pronouns or follow-up keywords and we have history,
+        # we append the context from the previous user message.
+        routing_message = message
+        lower = message.lower().strip()
+        if history and len(history) >= 2:
+            last_user_msg = next((m.content for m in reversed(history) if m.role == "user"), "")
+            if any(p in lower for p in ("they", "them", "it", "why", "those", "these", "explain", "detail", "describe")):
+                routing_message = f"{last_user_msg} {message}"
+
+        tool_result, tool_name = await asyncio.to_thread(self._route_tools, routing_message)
 
         tools_used: list[str] = []
         if tool_name:
@@ -40,7 +52,7 @@ class AssistantService:
         if settings.assistant_use_ollama:
             try:
                 answer = await asyncio.wait_for(
-                    self._ollama_format(message, tool_result),
+                    self._ollama_format(message, tool_result, history),
                     timeout=min(settings.ollama_timeout_seconds, _OLLAMA_FORMAT_TIMEOUT_SECONDS),
                 )
             except (asyncio.TimeoutError, Exception):
@@ -68,6 +80,22 @@ class AssistantService:
             )
         ):
             return self.tools.get_high_risk_assets(), "get_high_risk_assets"
+
+        if any(
+            k in lower
+            for k in (
+                "good condition",
+                "healthy",
+                "good health",
+                "best health",
+                "high health",
+                "low risk",
+                "lowest risk",
+                "safe",
+                "working condition",
+            )
+        ):
+            return self.tools.get_healthy_assets(), "get_healthy_assets"
 
         if any(
             k in lower
@@ -155,7 +183,12 @@ class AssistantService:
 
         return self.tools.get_dashboard_summary(), "get_dashboard_summary"
 
-    async def _ollama_format(self, message: str, tool_result: dict) -> str:
+    async def _ollama_format(self, message: str, tool_result: dict, history: list[ChatMessage] = []) -> str:
+        history_str = ""
+        for msg in history:
+            role_label = "User" if msg.role == "user" else "Assistant"
+            history_str += f"{role_label}: {msg.content}\n"
+
         prompt = (
             "You are AssetFlow AI, an operations assistant for non-technical staff.\n"
             "Rewrite the tool data into a short, friendly answer.\n"
@@ -165,6 +198,7 @@ class AssistantService:
             "- Keep asset tags in parentheses only when helpful\n"
             "- 2-5 sentences maximum unless listing items\n"
             "- Do not invent data not present in the tool output\n\n"
+            f"Conversation History:\n{history_str}\n"
             f"User question: {message}\n"
             f"Tool data: {tool_result.get('data_text', '')}\n"
         )
