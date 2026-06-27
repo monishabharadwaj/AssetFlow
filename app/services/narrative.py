@@ -358,6 +358,36 @@ def enterprise_health_brief(
     }
 
 
+def weekly_ops_brief_summary(
+    *,
+    total_assets: int,
+    high_risk_count: int,
+    maintenance_due: int,
+    drift_count: int,
+) -> str:
+    return (
+        f"This week the fleet has {total_assets} active assets under management. "
+        f"AI scoring flagged {high_risk_count} high-risk "
+        f"asset{'s' if high_risk_count != 1 else ''}, "
+        f"{maintenance_due} item{'s' if maintenance_due != 1 else ''} overdue for maintenance, "
+        f"and {drift_count} asset{'s' if drift_count != 1 else ''} showing a significant health decline. "
+        "Prioritize the high-risk and overdue items to keep operations stable."
+    )
+
+
+def policy_auto_maintenance_message(
+    *,
+    asset_name: str,
+    maintenance_type: str,
+    scheduled_date: date,
+) -> str:
+    label = maintenance_type_label(maintenance_type)
+    return (
+        f"{asset_name} was automatically scheduled for {label} on "
+        f"{scheduled_date.isoformat()} based on its AI health risk."
+    )
+
+
 def enterprise_explanation_summary(
     *,
     asset_name: str,

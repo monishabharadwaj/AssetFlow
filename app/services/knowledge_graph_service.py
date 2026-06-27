@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from app.exceptions.errors import NotFoundError
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.timeline_repository import TimelineRepository
 from app.schemas.operations import GraphEdge, GraphNode, KnowledgeGraphResponse
@@ -21,7 +22,9 @@ class KnowledgeGraphService:
         self.timeline_repository = timeline_repository
 
     def asset_neighborhood(self, asset_id: uuid.UUID) -> KnowledgeGraphResponse:
-        asset = self.asset_service.get_by_id(asset_id)
+        asset = self.asset_repository.get_by_id(asset_id)
+        if asset is None:
+            raise NotFoundError("Asset", str(asset_id))
         nodes: list[GraphNode] = []
         edges: list[GraphEdge] = []
 

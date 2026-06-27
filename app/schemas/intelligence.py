@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.explanation import PredictionExplanation
+
 
 class RiskLevel(str, enum.Enum):
     LOW = "LOW"
@@ -27,6 +29,7 @@ class HealthPredictionResponse(BaseModel):
     features_used: list[str]
     prediction_metadata: dict[str, Any]
     predicted_at: datetime
+    explanation: PredictionExplanation | None = None
 
 
 class BatchScoreResponse(BaseModel):

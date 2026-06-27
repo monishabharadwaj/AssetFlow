@@ -164,6 +164,21 @@ class DashboardRepository(BaseRepository[Asset]):
         records = self.db.execute(stmt).scalars().all()
         return [(r, r.asset) for r in records]
 
+    def recent_completed_maintenance(
+        self, limit: int = 5
+    ) -> list[tuple[MaintenanceRecord, Asset]]:
+        stmt = (
+            select(MaintenanceRecord, Asset)
+            .join(Asset, Asset.id == MaintenanceRecord.asset_id)
+            .where(
+                MaintenanceRecord.status == MaintenanceStatus.COMPLETED,
+                MaintenanceRecord.completed_date.is_not(None),
+            )
+            .order_by(MaintenanceRecord.completed_date.desc())
+            .limit(limit)
+        )
+        return [(record, asset) for record, asset in self.db.execute(stmt).all()]
+
     def assets_in_maintenance(self, limit: int = 10) -> list[Asset]:
         stmt = (
             select(Asset)

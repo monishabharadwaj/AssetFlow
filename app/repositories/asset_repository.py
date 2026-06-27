@@ -107,3 +107,15 @@ class AssetRepository(BaseRepository[Asset]):
 
     def update(self, asset: Asset, data: dict) -> Asset:
         return self.apply_partial_update(asset, data)
+
+    def get_type_names_for_assets(
+        self, asset_ids: list[uuid.UUID]
+    ) -> dict[str, str]:
+        if not asset_ids:
+            return {}
+        stmt = (
+            select(Asset.id, AssetType.name)
+            .join(AssetType, Asset.asset_type_id == AssetType.id)
+            .where(Asset.id.in_(asset_ids))
+        )
+        return {str(asset_id): name for asset_id, name in self.db.execute(stmt).all()}

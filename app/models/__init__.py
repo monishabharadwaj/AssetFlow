@@ -5,6 +5,7 @@ from app.models.department import Department
 from app.models.employee import Employee
 from app.models.health_history import AssetHealthHistory
 from app.models.maintenance import MaintenanceRecord
+from app.models.notification import Notification
 from app.models.transfer import AssetTransfer
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "AssetTransfer",
     "MaintenanceRecord",
     "AssetHealthHistory",
+    "Notification",
 ]

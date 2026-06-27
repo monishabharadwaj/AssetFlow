@@ -47,6 +47,26 @@ class MaintenanceRepository(BaseRepository[MaintenanceRecord]):
     def update(self, record: MaintenanceRecord, data: dict) -> MaintenanceRecord:
         return self.apply_partial_update(record, data)
 
+    def total_cost_for_asset(self, asset_id: uuid.UUID) -> float:
+        stmt = (
+            select(func.coalesce(func.sum(MaintenanceRecord.cost), 0))
+            .where(MaintenanceRecord.asset_id == asset_id)
+        )
+        return float(self.db.execute(stmt).scalar_one())
+
+    def has_open_maintenance(self, asset_id: uuid.UUID) -> bool:
+        stmt = (
+            select(func.count())
+            .select_from(MaintenanceRecord)
+            .where(
+                MaintenanceRecord.asset_id == asset_id,
+                MaintenanceRecord.status.in_(
+                    [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
+                ),
+            )
+        )
+        return self.db.execute(stmt).scalar_one() > 0
+
     def list_due(
         self,
         *,

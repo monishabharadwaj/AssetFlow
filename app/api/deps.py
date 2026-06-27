@@ -234,24 +234,31 @@ def get_replacement_planning_service(
 
 
 def get_report_service(
-    dashboard_repository: DashboardRepository = Depends(get_dashboard_repository),
-    asset_repository: AssetRepository = Depends(get_asset_repository),
+    dashboard_service: DashboardService = Depends(get_dashboard_service),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
+    drift_service: DriftMonitoringService = Depends(get_drift_monitoring_service),
+    replacement_service: ReplacementPlanningService = Depends(get_replacement_planning_service),
+    cost_service: CostOptimizationService = Depends(get_cost_optimization_service),
 ) -> ReportService:
-    return ReportService(dashboard_repository, asset_repository)
+    return ReportService(
+        dashboard_service,
+        recommendation_service,
+        drift_service,
+        replacement_service,
+        cost_service,
+    )
 
 
-def get_maintenance_scheduling_service(
-    asset_repository: AssetRepository = Depends(get_asset_repository),
-    maintenance_repository: MaintenanceRepository = Depends(get_maintenance_repository),
-) -> MaintenanceSchedulingService:
-    return MaintenanceSchedulingService(asset_repository, maintenance_repository)
+def get_maintenance_scheduling_service() -> MaintenanceSchedulingService:
+    return MaintenanceSchedulingService()
 
 
 def get_knowledge_graph_service(
+    asset_service: AssetService = Depends(get_asset_service),
     asset_repository: AssetRepository = Depends(get_asset_repository),
-    department_repository: DepartmentRepository = Depends(get_department_repository),
+    timeline_repository: TimelineRepository = Depends(get_timeline_repository),
 ) -> KnowledgeGraphService:
-    return KnowledgeGraphService(asset_repository, department_repository)
+    return KnowledgeGraphService(asset_service, asset_repository, timeline_repository)
 
 
 def get_policy_automation_service(
