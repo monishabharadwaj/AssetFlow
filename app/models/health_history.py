@@ -58,5 +58,5 @@ class AssetHealthHistory(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
 
     asset: Mapped["Asset"] = relationship(
         back_populates="health_history",
-        lazy="joined",
+        lazy="select",
     )

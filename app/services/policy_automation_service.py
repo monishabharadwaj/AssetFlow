@@ -5,12 +5,11 @@ from datetime import date, timedelta
 
 from app.core.config import settings
 from app.core.enums import MaintenanceStatus, MaintenanceType, NotificationSeverity, NotificationType
-from app.core.health_thresholds import should_notify_high_risk
+from app.core.health_thresholds import is_high_risk, should_notify_high_risk
 from app.models.maintenance import MaintenanceRecord
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.dashboard_repository import DashboardRepository
 from app.repositories.maintenance_repository import MaintenanceRepository
-from app.schemas.intelligence import RiskLevel
 from app.services import narrative as narr
 from app.services.notification_service import NotificationService
 from app.services.prediction_service import get_prediction_cache
@@ -42,9 +41,7 @@ class PolicyAutomationService:
         for prediction in get_prediction_cache().values():
             if maintenance_scheduled >= max_auto_schedule:
                 break
-            if prediction.risk_level != RiskLevel.HIGH:
-                continue
-            if not should_notify_high_risk(prediction.health_score):
+            if not is_high_risk(prediction.health_score):
                 continue
 
             asset_id = uuid.UUID(prediction.asset_id)
@@ -115,7 +112,9 @@ class PolicyAutomationService:
                     "severity": NotificationSeverity.HIGH,
                     "title": f"High risk — {prediction.asset_tag}",
                     "message": narr.high_risk_attention_message(
-                        asset_name=asset_name,
+                        asset_tag=prediction.asset_tag or "",
+                        asset_type=prediction.asset_type_name,
+                        department_name=prediction.department_name,
                         score=prediction.health_score,
                         risk_level=prediction.risk_level.value,
                     ),

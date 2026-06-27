@@ -10,7 +10,10 @@ from app.schemas.recommendation import (
     RecommendationPriority,
 )
 from app.services import narrative as narr
-from app.services.prediction_service import PredictionService, get_prediction_cache
+from app.services.prediction_service import PredictionService
+
+# Asset types old enough to justify replacement over repair when health collapses.
+_REPLACEMENT_AGE_DAYS = 480
 
 
 class RecommendationService:
@@ -22,46 +25,127 @@ class RecommendationService:
         self.prediction_service = prediction_service
         self.dashboard_repository = dashboard_repository
 
+    def _prediction_recommendation(self, prediction) -> MaintenanceRecommendation | None:
+        """Derive a single, diverse recommendation from a health prediction."""
+        health = prediction.health_score
+        health_pct = int(health * 100)
+        asset_tag = prediction.asset_tag or ""
+        asset_type = prediction.asset_type_name
+        department = prediction.department_name
+        meta = prediction.prediction_metadata or {}
+        features = meta.get("input_features", {})
+        age_days = int(features.get("asset_age_days", 0) or 0)
+        utilization = float(features.get("utilization_rate", 0) or 0)
+        failures = int(features.get("failure_count", 0) or 0)
+
+        base = dict(
+            asset_id=prediction.asset_id,
+            asset_tag=asset_tag,
+            asset_name=prediction.asset_name or asset_tag,
+            asset_type_name=asset_type,
+            department_name=department,
+            predicted_health_score=health,
+        )
+
+        # Critical + aging → replacement over repair.
+        if health < 0.40 and age_days >= _REPLACEMENT_AGE_DAYS:
+            return MaintenanceRecommendation(
+                **base,
+                title=narr.recommendation_card_title_category(asset_tag, category="REPLACEMENT"),
+                priority=RecommendationPriority.HIGH,
+                maintenance_type="REPLACEMENT",
+                suggested_within_days=30,
+                rationale=narr.recommendation_rationale_replacement(
+                    asset_tag=asset_tag, asset_type=asset_type,
+                    department_name=department, health_pct=health_pct,
+                ),
+                risk_level="HIGH",
+            )
+
+        # High risk → urgent preventive maintenance.
+        if health < 0.50:
+            return MaintenanceRecommendation(
+                **base,
+                title=narr.recommendation_card_title(
+                    asset_tag, maintenance_type="PREVENTIVE", urgent_health=True
+                ),
+                priority=RecommendationPriority.HIGH,
+                maintenance_type="PREVENTIVE",
+                suggested_within_days=7,
+                rationale=narr.recommendation_rationale_health_risk(
+                    asset_tag=asset_tag, asset_type=asset_type,
+                    department_name=department, health_pct=health_pct,
+                ),
+                risk_level="HIGH",
+            )
+
+        # Warning band with failures → inspection.
+        if health < 0.60 and failures >= 1:
+            return MaintenanceRecommendation(
+                **base,
+                title=narr.recommendation_card_title_category(asset_tag, category="INSPECTION"),
+                priority=RecommendationPriority.MEDIUM,
+                maintenance_type="INSPECTION",
+                suggested_within_days=14,
+                rationale=narr.recommendation_rationale_inspection(
+                    asset_tag=asset_tag, asset_type=asset_type, department_name=department,
+                ),
+                risk_level="MEDIUM",
+            )
+
+        # Healthy but old and heavily used → upgrade.
+        if health >= 0.70 and age_days >= 400 and utilization >= 0.6:
+            return MaintenanceRecommendation(
+                **base,
+                title=narr.recommendation_card_title_category(asset_tag, category="UPGRADE"),
+                priority=RecommendationPriority.LOW,
+                maintenance_type="UPGRADE",
+                suggested_within_days=60,
+                rationale=narr.recommendation_rationale_upgrade(
+                    asset_tag=asset_tag, asset_type=asset_type, department_name=department,
+                ),
+                risk_level="LOW",
+            )
+
+        # Monitor band → keep monitoring (low-noise, informational).
+        if 0.50 <= health < 0.70:
+            return MaintenanceRecommendation(
+                **base,
+                title=narr.recommendation_card_title_category(asset_tag, category="MONITORING"),
+                priority=RecommendationPriority.LOW,
+                maintenance_type="MONITORING",
+                suggested_within_days=30,
+                rationale=narr.recommendation_rationale_monitoring(
+                    asset_tag=asset_tag, asset_type=asset_type,
+                    department_name=department, health_pct=health_pct,
+                ),
+                risk_level="LOW",
+            )
+
+        return None
+
     def list_recommendations(self, *, limit: int = 10) -> RecommendationListResponse:
         items: list[MaintenanceRecommendation] = []
 
-        for prediction in self.prediction_service.get_all_cached_high_risk():
-            if prediction.risk_level.value == "HIGH":
-                health_pct = int(prediction.health_score * 100)
-                asset_name = prediction.asset_name or prediction.asset_tag or "Asset"
-                asset_tag = prediction.asset_tag or ""
-                items.append(
-                    MaintenanceRecommendation(
-                        asset_id=prediction.asset_id,
-                        asset_tag=asset_tag,
-                        asset_name=asset_name,
-                        title=narr.recommendation_card_title(
-                            asset_name,
-                            maintenance_type="PREVENTIVE",
-                            urgent_health=True,
-                        ),
-                        priority=RecommendationPriority.HIGH,
-                        maintenance_type="PREVENTIVE",
-                        suggested_within_days=7,
-                        rationale=narr.recommendation_rationale_health_risk(
-                            asset_name=asset_name,
-                            asset_tag=asset_tag,
-                            health_pct=health_pct,
-                        ),
-                        risk_level=prediction.risk_level.value,
-                        predicted_health_score=prediction.health_score,
-                    )
-                )
+        # 1. Prediction-derived recommendations (diverse categories).
+        for prediction in self.prediction_service.list_latest_predictions():
+            rec = self._prediction_recommendation(prediction)
+            if rec is not None:
+                items.append(rec)
 
+        # 2. Overdue scheduled maintenance (work already on the books).
         for record, asset in self.dashboard_repository.maintenance_due_items(limit=limit):
+            asset_type = asset.asset_type.name if asset.asset_type else None
+            department_name = asset.current_department.name if asset.current_department else None
             items.append(
                 MaintenanceRecommendation(
                     asset_id=str(asset.id),
                     asset_tag=asset.asset_tag,
                     asset_name=asset.name,
+                    asset_type_name=asset_type,
+                    department_name=department_name,
                     title=narr.recommendation_card_title(
-                        asset.name,
-                        maintenance_type=record.maintenance_type.value,
+                        asset.asset_tag, maintenance_type=record.maintenance_type.value
                     ),
                     priority=RecommendationPriority.HIGH,
                     maintenance_type=record.maintenance_type.value,
@@ -69,8 +153,9 @@ class RecommendationService:
                     if record.scheduled_date
                     else 0,
                     rationale=narr.recommendation_rationale_overdue(
-                        asset_name=asset.name,
                         asset_tag=asset.asset_tag,
+                        asset_type=asset_type,
+                        department_name=department_name,
                         maintenance_type=record.maintenance_type.value,
                         scheduled_date=record.scheduled_date,
                     ),
@@ -79,34 +164,39 @@ class RecommendationService:
                 )
             )
 
-        for prediction in get_prediction_cache().values():
-            if prediction.risk_level.value != "MEDIUM":
-                continue
-            failure_count = prediction.prediction_metadata.get("failure_count", 0)
-            if isinstance(failure_count, (int, float)) and failure_count >= 2:
-                asset_name = prediction.asset_name or prediction.asset_tag or "Asset"
-                asset_tag = prediction.asset_tag or ""
-                items.append(
-                    MaintenanceRecommendation(
-                        asset_id=prediction.asset_id,
-                        asset_tag=asset_tag,
-                        asset_name=asset_name,
-                        title=narr.recommendation_card_title(
-                            asset_name,
-                            maintenance_type="INSPECTION",
-                        ),
-                        priority=RecommendationPriority.MEDIUM,
-                        maintenance_type="INSPECTION",
-                        suggested_within_days=14,
-                        rationale=narr.recommendation_rationale_inspection(
-                            asset_name=asset_name,
-                            asset_tag=asset_tag,
-                        ),
-                        risk_level="MEDIUM",
-                        predicted_health_score=prediction.health_score,
+        # 3. Warranty renewals (lifecycle, non-maintenance category).
+        for asset in self.dashboard_repository.warranty_expiring_soon(within_days=30, limit=5):
+            asset_type = asset.asset_type.name if asset.asset_type else None
+            department_name = asset.current_department.name if asset.current_department else None
+            items.append(
+                MaintenanceRecommendation(
+                    asset_id=str(asset.id),
+                    asset_tag=asset.asset_tag,
+                    asset_name=asset.name,
+                    asset_type_name=asset_type,
+                    department_name=department_name,
+                    title=narr.recommendation_card_title_category(
+                        asset.asset_tag, category="WARRANTY_RENEWAL"
+                    ),
+                    priority=RecommendationPriority.MEDIUM,
+                    maintenance_type="WARRANTY_RENEWAL",
+                    suggested_within_days=max(
+                        0, (asset.warranty_expiry - date.today()).days
                     )
+                    if asset.warranty_expiry
+                    else 0,
+                    rationale=narr.recommendation_rationale_warranty(
+                        asset_tag=asset.asset_tag,
+                        asset_type=asset_type,
+                        department_name=department_name,
+                        expiry=asset.warranty_expiry,
+                    ),
+                    risk_level="MEDIUM",
+                    predicted_health_score=0.0,
                 )
+            )
 
+        # Deduplicate by asset+category, then order by priority.
         seen: set[str] = set()
         unique: list[MaintenanceRecommendation] = []
         for item in items:
@@ -121,6 +211,6 @@ class RecommendationService:
         return RecommendationListResponse(items=unique[:limit], total=len(unique))
 
     def list_for_asset(self, asset_id: uuid.UUID, *, limit: int = 5) -> RecommendationListResponse:
-        all_recs = self.list_recommendations(limit=50)
+        all_recs = self.list_recommendations(limit=200)
         filtered = [r for r in all_recs.items if r.asset_id == str(asset_id)]
         return RecommendationListResponse(items=filtered[:limit], total=len(filtered))

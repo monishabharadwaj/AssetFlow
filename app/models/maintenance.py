@@ -48,5 +48,5 @@ class MaintenanceRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     asset: Mapped["Asset"] = relationship(
         back_populates="maintenance_records",
-        lazy="joined",
+        lazy="select",
     )

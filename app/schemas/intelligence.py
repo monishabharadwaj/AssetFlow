@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.explanation import PredictionExplanation
+
 
 class RiskLevel(str, enum.Enum):
     LOW = "LOW"
@@ -19,6 +21,8 @@ class HealthPredictionResponse(BaseModel):
     asset_id: str
     asset_tag: str | None = None
     asset_name: str | None = None
+    asset_type_name: str | None = None
+    department_name: str | None = None
     health_score: float = Field(ge=0, le=1)
     risk_level: RiskLevel
     confidence: float = Field(ge=0, le=1)
@@ -27,6 +31,7 @@ class HealthPredictionResponse(BaseModel):
     features_used: list[str]
     prediction_metadata: dict[str, Any]
     predicted_at: datetime
+    explanation: PredictionExplanation | None = None
 
 
 class BatchScoreResponse(BaseModel):
@@ -39,6 +44,8 @@ class HighRiskAssetItem(BaseModel):
     asset_id: str
     asset_tag: str
     asset_name: str
+    asset_type_name: str | None = None
+    department_name: str | None = None
     health_score: float
     risk_level: RiskLevel
     predicted_at: datetime

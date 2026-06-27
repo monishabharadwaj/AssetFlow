@@ -6,7 +6,7 @@ from app.repositories.dashboard_repository import DashboardRepository
 from app.services import narrative as narr
 from app.services.asset_service import AssetService
 from app.services.dashboard_service import DashboardService
-from app.services.prediction_service import PredictionService, get_prediction_cache
+from app.services.prediction_service import PredictionService
 from app.services.recommendation_service import RecommendationService
 
 _ASSET_TYPE_ALIASES: dict[str, str] = {
@@ -128,8 +128,9 @@ class AssistantTools:
 
         bullets = [
             narr.high_risk_bullet(
-                asset_name=item.asset_name or item.asset_tag,
                 asset_tag=item.asset_tag,
+                asset_type=item.asset_type_name,
+                department_name=item.department_name,
                 health_pct=int(item.health_score * 100),
             )
             for item in high_risk.items
@@ -151,14 +152,15 @@ class AssistantTools:
         if not self.predictions.is_cache_warm():
             return self._scoring_required()
 
-        ranked = sorted(get_prediction_cache().values(), key=lambda p: p.health_score)[:5]
+        ranked = sorted(self.predictions.list_latest_predictions(), key=lambda p: p.health_score)[:5]
         if not ranked:
             return self._scoring_required()
 
         bullets = [
             narr.high_risk_bullet(
-                asset_name=p.asset_name or p.asset_tag or "Asset",
                 asset_tag=p.asset_tag or "",
+                asset_type=p.asset_type_name,
+                department_name=p.department_name,
                 health_pct=int(p.health_score * 100),
             )
             for p in ranked
@@ -361,4 +363,45 @@ class AssistantTools:
             "data_text": "Assistant capabilities",
             "fallback_answer": narr.assistant_capabilities_message(),
             "sources": [],
+        }
+
+    def get_healthy_assets(self) -> dict:
+        if not self.predictions.is_cache_warm():
+            return self._scoring_required()
+
+        latest = self.predictions.list_latest_predictions()
+        ranked = sorted(
+            [p for p in latest if p.health_score >= 0.8],
+            key=lambda p: p.health_score,
+            reverse=True,
+        )[:5]
+
+        if not ranked:
+            ranked = sorted(latest, key=lambda p: p.health_score, reverse=True)[:5]
+
+        if not ranked:
+            return {
+                "data_text": "No healthy assets found in the current scoring run.",
+                "fallback_answer": narr.format_assistant_reply(
+                    "I couldn't find health metrics for any assets. Please run AI scoring first.",
+                    [],
+                ),
+                "sources": [],
+            }
+
+        bullets = [
+            f"{p.asset_name or p.asset_tag} — health is excellent at {int(p.health_score * 100)}% ({p.asset_tag})"
+            for p in ranked
+        ]
+        sources = [
+            {"label": p.asset_tag or p.asset_id, "asset_id": p.asset_id, "url": f"/assets/{p.asset_id}"}
+            for p in ranked
+        ]
+        return {
+            "data_text": "; ".join(bullets),
+            "fallback_answer": narr.format_assistant_reply(
+                "These assets are in good condition with high predicted health:",
+                bullets,
+            ),
+            "sources": sources,
         }

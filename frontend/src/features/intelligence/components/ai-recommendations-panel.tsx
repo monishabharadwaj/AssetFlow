@@ -26,7 +26,7 @@ function priorityBadgeClass(priority: MaintenanceRecommendation["priority"]) {
 export function AiRecommendationsPanel() {
   const [showAll, setShowAll] = useState(false);
   const fetchLimit = showAll ? 50 : DISPLAY_LIMIT;
-  const { data, isLoading } = useRecommendations(fetchLimit);
+  const { data, isLoading, isError, error } = useRecommendations(fetchLimit);
   const scoreBatch = useScoreBatch();
 
   const visibleItems = data?.items ?? [];
@@ -58,7 +58,12 @@ export function AiRecommendationsPanel() {
         </Button>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isError ? (
+          <div className="rounded-md bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+            <p className="font-semibold mb-1">Failed to load AI recommendations</p>
+            <p>{error instanceof Error ? error.message : "An unexpected error occurred."}</p>
+          </div>
+        ) : isLoading ? (
           <p className="text-sm text-muted-foreground">Loading recommendations…</p>
         ) : !data?.items.length ? (
           <p className="text-sm text-muted-foreground">
@@ -81,6 +86,11 @@ export function AiRecommendationsPanel() {
                     <Wrench className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium leading-snug">{item.title}</p>
+                      {(item.asset_type_name || item.department_name) ? (
+                        <p className="mt-0.5 text-xs font-medium text-foreground/80">
+                          {[item.asset_type_name, item.department_name].filter(Boolean).join(" · ")}
+                        </p>
+                      ) : null}
                       <p className="mt-0.5 text-xs text-muted-foreground">{item.rationale}</p>
                     </div>
                     <span

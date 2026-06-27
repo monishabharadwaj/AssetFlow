@@ -18,6 +18,8 @@ export type MaintenanceRecommendation = {
   asset_id: string;
   asset_tag: string;
   asset_name: string;
+  asset_type_name: string | null;
+  department_name: string | null;
   title: string;
   priority: "HIGH" | "MEDIUM" | "LOW";
   maintenance_type: string;
@@ -66,8 +68,13 @@ export type AssistantChatResponse = {
   sources: Array<{ label: string; asset_id: string; url: string }>;
 };
 
-export function assistantChat(message: string) {
-  return apiPost<AssistantChatResponse>("/assistant/chat", { message });
+export type ChatHistoryItem = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export function assistantChat(data: { message: string; history: ChatHistoryItem[] }) {
+  return apiPost<AssistantChatResponse>("/assistant/chat", data);
 }
 
 export type MaintenanceWorkQueueItem = {

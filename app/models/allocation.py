@@ -44,9 +44,9 @@ class AssetAllocation(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
 
     asset: Mapped["Asset"] = relationship(
         back_populates="allocations",
-        lazy="joined",
+        lazy="select",
     )
     employee: Mapped["Employee"] = relationship(
         back_populates="allocations",
-        lazy="joined",
+        lazy="select",
     )

@@ -44,13 +44,13 @@ class AssetTransfer(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
 
     asset: Mapped["Asset"] = relationship(
         back_populates="transfers",
-        lazy="joined",
+        lazy="select",
     )
     from_department: Mapped["Department"] = relationship(
         foreign_keys=[from_department_id],
-        lazy="joined",
+        lazy="select",
     )
     to_department: Mapped["Department"] = relationship(
         foreign_keys=[to_department_id],
-        lazy="joined",
+        lazy="select",
     )

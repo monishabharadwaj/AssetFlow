@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     drift_healthy_floor: float = 0.75
     drift_notify_below: float = 0.60
 
+    policy_automation_enabled: bool = True
+    scheduler_enabled: bool = False
+    scheduler_interval_minutes: int = 60
+    scheduler_run_on_startup: bool = False
+
 
 
 settings = Settings()

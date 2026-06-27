@@ -9,6 +9,92 @@ def employee_display(first_name: str, last_name: str) -> str:
     return f"{first_name} {last_name}"
 
 
+def asset_context_phrase(
+    *,
+    asset_type: str | None = None,
+    department_name: str | None = None,
+) -> str:
+    """Plain-language fleet context for recommendations and alerts."""
+    if asset_type and department_name:
+        return f"{asset_type} assigned to {department_name}"
+    if asset_type:
+        return asset_type
+    if department_name:
+        return f"Asset in {department_name}"
+    return "This asset"
+
+
+def recommendation_card_title(
+    asset_tag: str,
+    *,
+    maintenance_type: str,
+    urgent_health: bool = False,
+) -> str:
+    label = maintenance_type_label(maintenance_type)
+    if urgent_health:
+        return f"{asset_tag} needs urgent maintenance"
+    if maintenance_type.upper() == "PREVENTIVE":
+        return f"{asset_tag} needs preventive maintenance"
+    return f"{asset_tag} needs {label}"
+
+
+def recommendation_rationale_health_risk(
+    *,
+    asset_tag: str,
+    asset_type: str | None,
+    department_name: str | None,
+    health_pct: int,
+    within_days: int = 7,
+) -> str:
+    context = asset_context_phrase(asset_type=asset_type, department_name=department_name)
+    return (
+        f"{context}: predicted health is {health_pct}% (high risk). "
+        f"Schedule preventive maintenance within {within_days} days."
+    )
+
+
+def recommendation_rationale_overdue(
+    *,
+    asset_tag: str,
+    asset_type: str | None,
+    department_name: str | None,
+    maintenance_type: str,
+    scheduled_date: date | None,
+) -> str:
+    label = maintenance_type_label(maintenance_type)
+    context = asset_context_phrase(asset_type=asset_type, department_name=department_name)
+    date_text = scheduled_date.isoformat() if scheduled_date else "an earlier date"
+    return (
+        f"{context} ({asset_tag}): {label.lower()} was due on {date_text}. "
+        "Please schedule as soon as possible."
+    )
+
+
+def recommendation_rationale_inspection(
+    *,
+    asset_tag: str,
+    asset_type: str | None,
+    department_name: str | None,
+    within_days: int = 14,
+) -> str:
+    context = asset_context_phrase(asset_type=asset_type, department_name=department_name)
+    return (
+        f"{context} ({asset_tag}): moderate risk with repeated failures in its history. "
+        f"Book an inspection within {within_days} days."
+    )
+
+
+def high_risk_bullet(
+    *,
+    asset_tag: str,
+    asset_type: str | None,
+    department_name: str | None,
+    health_pct: int,
+) -> str:
+    context = asset_context_phrase(asset_type=asset_type, department_name=department_name)
+    return f"{asset_tag} — {context}: health is critically low at {health_pct}%"
+
+
 def allocation_headline(
     action: AllocationAction | str,
     *,
@@ -102,10 +188,18 @@ def health_snapshot_message(
     return f"{asset_name} received a new health assessment."
 
 
-def high_risk_attention_message(*, asset_name: str, score: float, risk_level: str) -> str:
+def high_risk_attention_message(
+    *,
+    asset_tag: str,
+    asset_type: str | None,
+    department_name: str | None,
+    score: float,
+    risk_level: str,
+) -> str:
+    context = asset_context_phrase(asset_type=asset_type, department_name=department_name)
     pct = int(float(score) * 100)
     return (
-        f"{asset_name} AI health prediction is {pct}% ({risk_level} risk). "
+        f"{asset_tag} ({context}): AI health is {pct}% ({risk_level} risk). "
         f"Review maintenance and operational history."
     )
 
@@ -118,7 +212,78 @@ _MAINTENANCE_TYPE_LABELS = {
     "UPGRADE": "upgrade",
     "INSPECTION": "inspection",
     "OTHER": "maintenance",
+    "REPLACEMENT": "replacement",
+    "WARRANTY_RENEWAL": "warranty renewal",
+    "MONITORING": "monitoring",
 }
+
+
+def recommendation_rationale_replacement(
+    *,
+    asset_tag: str,
+    asset_type: str | None,
+    department_name: str | None,
+    health_pct: int,
+) -> str:
+    context = asset_context_phrase(asset_type=asset_type, department_name=department_name)
+    return (
+        f"{context} ({asset_tag}): health has fallen to {health_pct}% and the asset is near "
+        "end-of-life. Evaluate replacement rather than further repair."
+    )
+
+
+def recommendation_rationale_warranty(
+    *,
+    asset_tag: str,
+    asset_type: str | None,
+    department_name: str | None,
+    expiry: date | None,
+) -> str:
+    context = asset_context_phrase(asset_type=asset_type, department_name=department_name)
+    when = expiry.isoformat() if expiry else "soon"
+    return (
+        f"{context} ({asset_tag}): warranty expires {when}. "
+        "Renew or extend coverage before it lapses."
+    )
+
+
+def recommendation_rationale_upgrade(
+    *,
+    asset_tag: str,
+    asset_type: str | None,
+    department_name: str | None,
+) -> str:
+    context = asset_context_phrase(asset_type=asset_type, department_name=department_name)
+    return (
+        f"{context} ({asset_tag}): heavily utilized and aging while still healthy. "
+        "Plan a performance upgrade to extend useful life."
+    )
+
+
+def recommendation_rationale_monitoring(
+    *,
+    asset_tag: str,
+    asset_type: str | None,
+    department_name: str | None,
+    health_pct: int,
+) -> str:
+    context = asset_context_phrase(asset_type=asset_type, department_name=department_name)
+    return (
+        f"{context} ({asset_tag}): health is {health_pct}% (monitor range). "
+        "No action needed yet — keep an eye on the next assessment."
+    )
+
+
+def recommendation_card_title_category(asset_tag: str, *, category: str) -> str:
+    titles = {
+        "REPLACEMENT": f"{asset_tag} — plan replacement",
+        "WARRANTY_RENEWAL": f"{asset_tag} — renew warranty",
+        "UPGRADE": f"{asset_tag} — schedule upgrade",
+        "MONITORING": f"{asset_tag} — keep monitoring",
+        "INSPECTION": f"{asset_tag} needs inspection",
+        "PREVENTIVE": f"{asset_tag} needs preventive maintenance",
+    }
+    return titles.get(category, f"{asset_tag} needs {maintenance_type_label(category)}")
 
 
 def maintenance_type_label(maintenance_type: str) -> str:
@@ -159,61 +324,6 @@ def format_assistant_reply(
     if footer:
         lines.append(footer)
     return "\n".join(lines)
-
-
-def recommendation_card_title(
-    asset_name: str,
-    *,
-    maintenance_type: str,
-    urgent_health: bool = False,
-) -> str:
-    label = maintenance_type_label(maintenance_type)
-    if urgent_health:
-        return f"{asset_name} needs urgent service"
-    if maintenance_type.upper() == "PREVENTIVE":
-        return f"{asset_name} needs preventive service"
-    return f"{asset_name} needs {label}"
-
-
-def recommendation_rationale_health_risk(
-    *,
-    asset_name: str,
-    asset_tag: str,
-    health_pct: int,
-    within_days: int = 7,
-) -> str:
-    return (
-        f"Predicted health is only {health_pct}%. "
-        f"Schedule preventive maintenance within {within_days} days ({asset_tag})."
-    )
-
-
-def recommendation_rationale_overdue(
-    *,
-    asset_name: str,
-    asset_tag: str,
-    maintenance_type: str,
-    scheduled_date: date | None,
-) -> str:
-    label = maintenance_type_label(maintenance_type)
-    date_text = scheduled_date.isoformat() if scheduled_date else "an earlier date"
-    return f"{label.capitalize()} was due on {date_text}. Please schedule as soon as possible ({asset_tag})."
-
-
-def recommendation_rationale_inspection(
-    *,
-    asset_name: str,
-    asset_tag: str,
-    within_days: int = 14,
-) -> str:
-    return (
-        f"Moderate risk with repeated failures in its history. "
-        f"Book an inspection within {within_days} days ({asset_tag})."
-    )
-
-
-def high_risk_bullet(*, asset_name: str, asset_tag: str, health_pct: int) -> str:
-    return f"{asset_name} — health is critically low at {health_pct}% ({asset_tag})"
 
 
 def maintenance_rec_bullet(
@@ -356,6 +466,36 @@ def enterprise_health_brief(
         "remaining_useful_life": remaining_useful_life,
         "is_improvement": is_improvement,
     }
+
+
+def weekly_ops_brief_summary(
+    *,
+    total_assets: int,
+    high_risk_count: int,
+    maintenance_due: int,
+    drift_count: int,
+) -> str:
+    return (
+        f"This week the fleet has {total_assets} active assets under management. "
+        f"AI scoring flagged {high_risk_count} high-risk "
+        f"asset{'s' if high_risk_count != 1 else ''}, "
+        f"{maintenance_due} item{'s' if maintenance_due != 1 else ''} overdue for maintenance, "
+        f"and {drift_count} asset{'s' if drift_count != 1 else ''} showing a significant health decline. "
+        "Prioritize the high-risk and overdue items to keep operations stable."
+    )
+
+
+def policy_auto_maintenance_message(
+    *,
+    asset_name: str,
+    maintenance_type: str,
+    scheduled_date: date,
+) -> str:
+    label = maintenance_type_label(maintenance_type)
+    return (
+        f"{asset_name} was automatically scheduled for {label} on "
+        f"{scheduled_date.isoformat()} based on its AI health risk."
+    )
 
 
 def enterprise_explanation_summary(

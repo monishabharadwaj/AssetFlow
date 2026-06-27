@@ -34,4 +34,4 @@ class Notification(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     )
     is_read: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
 
-    asset: Mapped["Asset | None"] = relationship(lazy="joined")
+    asset: Mapped["Asset | None"] = relationship(lazy="select")

@@ -31,15 +31,15 @@ class Employee(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     department: Mapped["Department"] = relationship(
         back_populates="employees",
-        lazy="joined",
+        lazy="select",
     )
     assigned_assets: Mapped[list["Asset"]] = relationship(
         back_populates="current_assigned_employee",
-        lazy="selectin",
+        lazy="select",
     )
     allocations: Mapped[list["AssetAllocation"]] = relationship(
         back_populates="employee",
-        lazy="selectin",
+        lazy="select",
     )
 
     @property
