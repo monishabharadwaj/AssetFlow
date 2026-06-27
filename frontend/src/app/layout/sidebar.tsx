@@ -1,4 +1,11 @@
-import { BarChart3, Building2, ClipboardList, LayoutGrid, Settings, Users } from "lucide-react";
+import {
+  BarChart3,
+  Building2,
+  ClipboardList,
+  LayoutGrid,
+  Settings,
+  Users,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { cn } from "../../shared/lib/utils";
@@ -15,8 +22,12 @@ export function Sidebar() {
   return (
     <aside className="hidden w-72 border-r border-slate-800 bg-[#111827] md:flex md:flex-col">
       <div className="border-b border-white/10 px-6 py-4">
-        <p className="text-xs uppercase tracking-wide text-white/40">AssetFlow AI</p>
-        <h1 className="mt-1 text-lg font-semibold text-white">Operations Console</h1>
+        <p className="text-xs uppercase tracking-wide text-white/40">
+          AssetFlow AI
+        </p>
+        <h1 className="mt-1 text-lg font-semibold text-white">
+          Operations Console
+        </h1>
       </div>
       <nav className="space-y-1 px-3 py-4">
         {navItems.map((item) => (
@@ -25,9 +36,9 @@ export function Sidebar() {
             to={item.to}
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-sm transition-all duration-300",
                 isActive
-                  ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                  ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-[0_0_10px_rgba(168,85,247,0.45)]"
                   : "text-white/50 hover:bg-white/5 hover:text-white",
               )
             }
