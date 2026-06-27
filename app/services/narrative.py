@@ -302,10 +302,14 @@ def assistant_capabilities_message() -> str:
     return format_assistant_reply(
         "I can help with:",
         [
-            "Assets that need maintenance or are high risk",
-            "Recent transfers and department ownership",
+            "High-risk and healthy assets (AI health scores)",
+            "Health details for a specific asset tag (e.g. IT-LAP-0001)",
+            "Overdue maintenance and assets currently in maintenance",
+            "AI maintenance recommendations and warranty renewals",
+            "Recent transfers, assignments, and completed maintenance",
+            "Assets in a department or assigned to an employee",
             "Fleet counts (assets, employees, laptops, and more)",
-            "Finding assets by name, tag, or location",
+            "Finding assets by name, tag, status, or location",
         ],
         footer="Try a suggested prompt or ask in your own words.",
     )
@@ -370,6 +374,56 @@ def fleet_count_bullet(label: str, count: int) -> str:
 
 def warranty_expiring_bullet(*, asset_name: str, asset_tag: str, expiry: date) -> str:
     return f"{asset_name} — warranty expires {expiry.isoformat()} ({asset_tag})"
+
+
+def department_summary_bullet(
+    *,
+    department_name: str,
+    asset_count: int,
+    employee_count: int,
+) -> str:
+    return f"{department_name}: {asset_count} active assets, {employee_count} employees"
+
+
+def employee_assets_intro(*, employee_name: str, asset_count: int) -> str:
+    if asset_count == 0:
+        return f"{employee_name} has no assets currently assigned."
+    return f"{employee_name} has {asset_count} assigned asset{'s' if asset_count != 1 else ''}:"
+
+
+def overdue_maintenance_bullet(
+    *,
+    asset_tag: str,
+    maintenance_type: str,
+    scheduled_date: date | None,
+) -> str:
+    when = scheduled_date.isoformat() if scheduled_date else "unknown date"
+    label = maintenance_type_label(maintenance_type)
+    return f"{asset_tag} — overdue {label} (scheduled {when})"
+
+
+def allocation_activity_bullet(
+    *,
+    asset_tag: str,
+    employee_name: str,
+    action: str,
+) -> str:
+    verb = action.replace("_", " ").lower()
+    return f"{asset_tag} {verb} to {employee_name}"
+
+
+def asset_health_summary_bullet(
+    *,
+    asset_tag: str,
+    health_pct: int,
+    risk_level: str,
+    band_label: str,
+) -> str:
+    return f"{asset_tag} — {band_label} at {health_pct}% ({risk_level} risk)"
+
+
+def health_trend_bullet(*, recorded_at: str, health_pct: int) -> str:
+    return f"{recorded_at}: {health_pct}%"
 
 
 def explanation_factor_message(factor: str, value: str, severity: str) -> str:

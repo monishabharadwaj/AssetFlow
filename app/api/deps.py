@@ -172,13 +172,22 @@ def get_assistant_tools(
     prediction_service: PredictionService = Depends(get_prediction_service),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
     dashboard_repository: DashboardRepository = Depends(get_dashboard_repository),
+    asset_repository: AssetRepository = Depends(get_asset_repository),
+    department_repository: DepartmentRepository = Depends(get_department_repository),
+    employee_repository: EmployeeRepository = Depends(get_employee_repository),
+    health_history_repository: HealthHistoryRepository = Depends(get_health_history_repository),
 ) -> AssistantTools:
+    prediction_service.ensure_predictions_loaded()
     return AssistantTools(
         dashboard_service,
         asset_service,
         prediction_service,
         recommendation_service,
         dashboard_repository,
+        asset_repository,
+        department_repository,
+        employee_repository,
+        health_history_repository,
     )
 
 

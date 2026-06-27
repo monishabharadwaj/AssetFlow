@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bot, Loader2, Send } from "lucide-react";
+import { Bot, Loader2, Send, Trash2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 
 import { assistantChat } from "../../intelligence/api/intelligence-api";
@@ -15,38 +15,146 @@ const SUGGESTED_PROMPTS = [
   "Which department owns the most assets?",
 ];
 
+/** Human-readable labels for backend tool names (shown as small badges). */
+const TOOL_LABELS: Record<string, string> = {
+  get_dashboard_summary: "Fleet overview",
+  get_high_risk_assets: "High-risk assets",
+  get_healthy_assets: "Healthy assets",
+  get_worst_health_assets: "Lowest health",
+  get_maintenance_recommendations: "AI recommendations",
+  get_overdue_maintenance: "Overdue maintenance",
+  get_assets_in_maintenance: "In maintenance",
+  get_recent_allocations: "Recent assignments",
+  get_recent_completed_maintenance: "Completed maintenance",
+  get_recent_transfers: "Recent transfers",
+  get_warranty_expiring: "Warranty expiring",
+  get_fleet_counts: "Fleet counts",
+  get_department_assets: "Department assets",
+  get_employee_assets: "Employee assets",
+  get_assets_by_status: "Assets by status",
+  get_asset_health_detail: "Asset health",
+  search_assets: "Asset search",
+  get_help: "Help",
+};
+
 type AssistantPanelProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
+type HistoryItem = {
+  role: "user" | "assistant";
+  text: string;
+  toolsUsed?: string[];
+  sources?: Array<{
+    label: string;
+    asset_id: string;
+    url: string;
+  }>;
+};
+
 function AssistantMessage({ text }: { text: string }) {
-  const lines = text.split("\n").filter((line) => line.trim().length > 0);
-  return (
-    <div className="space-y-1.5">
-      {lines.map((line, index) => {
-        const trimmed = line.trim();
-        if (trimmed.startsWith("•")) {
-          return (
-            <p key={`${index}-${trimmed}`} className="pl-1 leading-relaxed">
-              {trimmed}
-            </p>
-          );
-        }
+  const lines = text.split("\n");
+  const renderedElements: React.ReactNode[] = [];
+  let currentList: React.ReactNode[] = [];
+
+  const flushList = (keyPrefix: string | number) => {
+    if (currentList.length > 0) {
+      renderedElements.push(
+        <ul key={`list-${keyPrefix}`} className="list-disc pl-5 space-y-1 my-1.5">
+          {currentList}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
+
+  const parseInline = (lineText: string) => {
+    const parts = lineText.split(/(\*\*.*?\*\*|`.*?`)/g);
+    return parts.map((part, partIdx) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={partIdx}>{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith("`") && part.endsWith("`")) {
         return (
-          <p key={`${index}-${trimmed}`} className="leading-relaxed">
-            {trimmed}
+          <code key={partIdx} className="bg-muted px-1.5 py-0.5 rounded text-[11px] font-mono border">
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
+      return part;
+    });
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    const isNumbered = /^\d+\.\s/.test(trimmed);
+    const isBullet = !isNumbered && (trimmed.startsWith("•") || trimmed.startsWith("-") || trimmed.startsWith("*"));
+
+    if (isNumbered) {
+      const displayLine = trimmed.replace(/^\d+\.\s*/, "");
+      currentList.push(
+        <li key={`li-${index}`} className="leading-relaxed text-sm list-decimal">
+          {parseInline(displayLine)}
+        </li>
+      );
+    } else if (isBullet) {
+      const displayLine = trimmed.replace(/^[•\-\*]\s*/, "");
+      currentList.push(
+        <li key={`li-${index}`} className="leading-relaxed text-sm">
+          {parseInline(displayLine)}
+        </li>
+      );
+    } else {
+      flushList(index);
+      if (trimmed.startsWith("###")) {
+        renderedElements.push(
+          <h4 key={`h4-${index}`} className="text-sm font-semibold mt-2.5 mb-1">
+            {trimmed.replace(/^###\s*/, "")}
+          </h4>
+        );
+      } else if (trimmed.startsWith("##")) {
+        renderedElements.push(
+          <h3 key={`h3-${index}`} className="text-base font-semibold mt-3.5 mb-1.5">
+            {trimmed.replace(/^##\s*/, "")}
+          </h3>
+        );
+      } else if (trimmed.length > 0) {
+        renderedElements.push(
+          <p key={`p-${index}`} className="leading-relaxed text-sm my-1">
+            {parseInline(trimmed)}
           </p>
         );
-      })}
-    </div>
-  );
+      } else {
+        renderedElements.push(<div key={`br-${index}`} className="h-1.5" />);
+      }
+    }
+  });
+
+  flushList("final");
+
+  return <div className="space-y-0.5">{renderedElements}</div>;
 }
 
 export function AssistantPanel({ open, onOpenChange }: AssistantPanelProps) {
   const [message, setMessage] = useState("");
-  const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem("assetflow_chat_history");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("assetflow_chat_history", JSON.stringify(history));
+    } catch (e) {
+      console.error("Failed to save history to localStorage", e);
+    }
+  }, [history]);
 
   const chat = useMutation({
     mutationFn: (variables: string) => {
@@ -62,7 +170,15 @@ export function AssistantPanel({ open, onOpenChange }: AssistantPanelProps) {
       setPendingPrompt(variables);
     },
     onSuccess: (data) => {
-      setHistory((prev) => [...prev, { role: "assistant", text: data.answer }]);
+      setHistory((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: data.answer,
+          toolsUsed: data.tools_used,
+          sources: data.sources,
+        },
+      ]);
       setPendingPrompt(null);
     },
     onError: () => {
@@ -78,9 +194,32 @@ export function AssistantPanel({ open, onOpenChange }: AssistantPanelProps) {
 
   const send = () => submitMessage(message);
 
+  const clearChat = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem("assetflow_chat_history");
+    } catch {}
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title="AssetFlow Assistant">
       <div className="flex max-h-[70vh] flex-col gap-3">
+        <div className="flex items-center justify-between border-b pb-2">
+          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">AI Operations Assistant</span>
+          {history.length > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto p-0 text-xs text-rose-600 hover:text-rose-700 hover:bg-transparent flex items-center gap-1"
+              onClick={clearChat}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Clear chat history
+            </Button>
+          ) : null}
+        </div>
+
         <div className="flex-1 space-y-3 overflow-y-auto pr-1">
           {history.length === 0 && !chat.isPending ? (
             <div className="space-y-2">
@@ -117,8 +256,15 @@ export function AssistantPanel({ open, onOpenChange }: AssistantPanelProps) {
                   }
                 >
                   {entry.role === "assistant" ? (
-                    <div className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                      <Bot className="h-3 w-3" /> Assistant
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                        <Bot className="h-3 w-3" /> Assistant
+                      </span>
+                      {entry.toolsUsed?.length ? (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {TOOL_LABELS[entry.toolsUsed[0]] ?? entry.toolsUsed[0]}
+                        </span>
+                      ) : null}
                     </div>
                   ) : null}
                   {entry.role === "assistant" ? (
@@ -126,6 +272,24 @@ export function AssistantPanel({ open, onOpenChange }: AssistantPanelProps) {
                   ) : (
                     entry.text
                   )}
+
+                  {entry.role === "assistant" && entry.sources?.length ? (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5 border-t pt-2">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mr-1 self-center">
+                        Sources:
+                      </span>
+                      {entry.sources.map((source) => (
+                        <Link
+                          key={source.asset_id}
+                          to={source.url}
+                          className="inline-flex items-center rounded bg-primary/5 px-2 py-0.5 text-xs text-primary hover:bg-primary/10 border border-primary/10"
+                          onClick={() => onOpenChange(false)}
+                        >
+                          {source.label}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
               {chat.isPending ? (
@@ -142,21 +306,6 @@ export function AssistantPanel({ open, onOpenChange }: AssistantPanelProps) {
             </p>
           ) : null}
         </div>
-
-        {chat.data?.sources?.length ? (
-          <div className="flex flex-wrap gap-2 border-t pt-2">
-            {chat.data.sources.map((source) => (
-              <Link
-                key={source.asset_id}
-                to={source.url}
-                className="text-xs text-primary hover:underline"
-                onClick={() => onOpenChange(false)}
-              >
-                {source.label}
-              </Link>
-            ))}
-          </div>
-        ) : null}
 
         <div className="flex gap-2 border-t pt-3">
           <Input

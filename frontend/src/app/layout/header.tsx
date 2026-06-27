@@ -20,7 +20,7 @@ export function Header() {
           <div className="min-w-0 flex-1">
             <Breadcrumbs />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -38,7 +38,7 @@ export function Header() {
               aria-label="Open AI assistant"
             >
               <Bot className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Assistant</span>
+              Assistant
             </Button>
             <Button
               type="button"
@@ -48,7 +48,7 @@ export function Header() {
               aria-label="Scan asset QR code"
             >
               <ScanLine className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Scan</span>
+              Scan
             </Button>
             <Badge variant="secondary">Demo User</Badge>
           </div>

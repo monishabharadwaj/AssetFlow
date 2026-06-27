@@ -76,3 +76,7 @@ class EmployeeRepository(BaseRepository[Employee]):
             )
         )
         return self.db.execute(stmt).scalar_one()
+
+    def find_best_match(self, query: str) -> Employee | None:
+        items, _ = self.list(page=1, page_size=1, is_active=True, search=query)
+        return items[0] if items else None

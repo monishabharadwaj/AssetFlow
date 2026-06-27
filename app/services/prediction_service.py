@@ -173,6 +173,10 @@ class PredictionService:
         self.ensure_predictions_loaded()
         return list(_PREDICTION_CACHE.values())
 
+    def get_cached_prediction(self, asset_id: uuid.UUID | str) -> HealthPredictionResponse | None:
+        self.ensure_predictions_loaded()
+        return _PREDICTION_CACHE.get(str(asset_id))
+
     def get_high_risk(self, *, limit: int = 20) -> HighRiskListResponse:
         self.ensure_predictions_loaded()
         items = [

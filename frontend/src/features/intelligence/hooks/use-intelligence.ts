@@ -44,7 +44,7 @@ export function useAssetRecommendations(assetId: string) {
 export function useScoreBatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (persist = true) => scoreBatch(persist),
+    mutationFn: (persist?: boolean) => scoreBatch(persist ?? true),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
       void queryClient.invalidateQueries({ queryKey: ["intelligence"] });

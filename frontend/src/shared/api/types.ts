@@ -61,6 +61,35 @@ export type DashboardSummary = {
     message: string;
     occurred_at: string | null;
   }>;
+  operational_posture?: {
+    critical_count: number;
+    warning_count: number;
+    monitor_count: number;
+    healthy_count: number;
+    excellent_count: number;
+    recently_improved_count: number;
+    fleet_health_avg_pct?: number;
+    ai_scored_count: number;
+    maintenance_completed_today: number;
+  };
+  health_distribution?: Array<{
+    band: string;
+    label: string;
+    count: number;
+  }>;
+  health_trend_30d?: Array<{
+    date: string;
+    value: number;
+  }>;
+  ops_headline?: string;
+  kpi_hero?: Array<{
+    key: string;
+    label: string;
+    value: number;
+    accent: string;
+    delta_label: string | null;
+    trend: number[];
+  }>;
 };
 
 export type Asset = {

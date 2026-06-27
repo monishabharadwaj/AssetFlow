@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import httpx
 
 from app.core.config import settings
 from app.schemas.assistant import AssistantChatRequest, AssistantChatResponse, AssistantSource, ChatMessage
 from app.services import narrative as narr
 from app.services.assistant_tools import AssistantTools
+from app.services.assistant_parsing import (
+    extract_asset_tag,
+    extract_department_query,
+    extract_employee_query,
+    extract_status_query,
+    is_department_ranking_query,
+)
 
 _OLLAMA_FORMAT_TIMEOUT_SECONDS = 35.0
 
@@ -49,12 +57,16 @@ class AssistantService:
                 sources=sources,
             )
 
-        if settings.assistant_use_ollama:
+        use_fallback = _should_use_fallback_answer(tool_result)
+
+        if settings.assistant_use_ollama and not use_fallback:
             try:
                 answer = await asyncio.wait_for(
                     self._ollama_format(message, tool_result, history),
                     timeout=min(settings.ollama_timeout_seconds, _OLLAMA_FORMAT_TIMEOUT_SECONDS),
                 )
+                if not _validate_ollama_output(answer, tool_result.get("data_text", "")):
+                    answer = fallback
             except (asyncio.TimeoutError, Exception):
                 answer = fallback
         else:
@@ -67,6 +79,21 @@ class AssistantService:
 
         if any(k in lower for k in ("help", "what can you", "what do you", "capabilities")):
             return self.tools.get_help(), "get_help"
+
+        asset_tag = extract_asset_tag(message)
+        if asset_tag and any(
+            k in lower
+            for k in (
+                "health",
+                "condition",
+                "risk",
+                "score",
+                "how is",
+                "status of",
+                "predicted",
+            )
+        ):
+            return self.tools.get_asset_health_detail(message), "get_asset_health_detail"
 
         if any(
             k in lower
@@ -109,18 +136,95 @@ class AssistantService:
         ):
             return self.tools.get_worst_health_assets(), "get_worst_health_assets"
 
+        if any(k in lower for k in ("overdue", "past due", "late maintenance", "due maintenance")):
+            return self.tools.get_overdue_maintenance(), "get_overdue_maintenance"
+
+        if any(
+            k in lower
+            for k in ("in maintenance", "being serviced", "under repair", "being repaired")
+        ):
+            return self.tools.get_assets_in_maintenance(), "get_assets_in_maintenance"
+
+        if any(
+            k in lower
+            for k in (
+                "completed maintenance",
+                "maintenance completed",
+                "finished maintenance",
+                "recently serviced",
+            )
+        ):
+            return self.tools.get_recent_completed_maintenance(), "get_recent_completed_maintenance"
+
+        employee_query = extract_employee_query(message)
+        if employee_query:
+            return self.tools.get_employee_assets(message), "get_employee_assets"
+
+        if any(
+            k in lower
+            for k in (
+                "assigned to",
+                "who has",
+                "employee assets",
+                "staff assets",
+            )
+        ):
+            return self.tools.get_employee_assets(message), "get_employee_assets"
+
+        if is_department_ranking_query(message) or any(
+            k in lower
+            for k in (
+                "most assets",
+                "overview",
+                "summary",
+                "snapshot",
+                "operations center",
+            )
+        ):
+            return self.tools.get_dashboard_summary(), "get_dashboard_summary"
+
+        if extract_status_query(message):
+            return self.tools.get_assets_by_status(message), "get_assets_by_status"
+
+        dept_query = extract_department_query(message)
+        if dept_query or any(
+            k in lower for k in ("department", "assets in", "dept ")
+        ):
+            return self.tools.get_department_assets(message), "get_department_assets"
+
         if any(
             k in lower
             for k in (
                 "recommend",
+                "needs attention",
+                "ai recommendation",
+                "what should we fix",
+            )
+        ):
+            return self.tools.get_maintenance_recommendations(), "get_maintenance_recommendations"
+
+        if any(
+            k in lower
+            for k in (
                 "maintenance",
                 "service",
                 "repair",
-                "needs attention",
                 "require maintenance",
             )
         ):
             return self.tools.get_maintenance_recommendations(), "get_maintenance_recommendations"
+
+        if any(
+            k in lower
+            for k in (
+                "allocation",
+                "assigned",
+                "assignment",
+                "checked out",
+                "who got",
+            )
+        ):
+            return self.tools.get_recent_allocations(), "get_recent_allocations"
 
         if any(k in lower for k in ("transfer", "moved", "relocated", "reassign department")):
             return self.tools.get_recent_transfers(), "get_recent_transfers"
@@ -135,13 +239,6 @@ class AssistantService:
                 "count",
                 "total",
                 "number of",
-                "employees",
-                "employee",
-                "laptop",
-                "laptops",
-                "server",
-                "servers",
-                "printer",
                 "fleet size",
             )
         ):
@@ -150,30 +247,34 @@ class AssistantService:
         if any(
             k in lower
             for k in (
-                "department",
-                "own",
-                "most assets",
-                "overview",
-                "summary",
-                "snapshot",
-                "operations center",
+                "search",
+                "find",
+                "where is",
+                "location",
+                "show",
             )
         ):
-            return self.tools.get_dashboard_summary(), "get_dashboard_summary"
+            return self.tools.search_assets(message), "search_assets"
+
+        if any(
+            k in lower
+            for k in (
+                "employees",
+                "employee",
+                "laptop",
+                "laptops",
+                "server",
+                "servers",
+                "printer",
+            )
+        ):
+            return self.tools.get_fleet_counts(message), "get_fleet_counts"
 
         if any(
             k in lower
             for k in (
                 "asset",
-                "laptop",
-                "server",
                 "van",
-                "printer",
-                "search",
-                "show",
-                "find",
-                "where is",
-                "location",
             )
         ):
             return self.tools.search_assets(message), "search_assets"
@@ -214,3 +315,49 @@ class AssistantService:
             if not text:
                 return tool_result.get("fallback_answer", narr.assistant_capabilities_message())
             return text
+
+
+def _should_use_fallback_answer(tool_result: dict) -> bool:
+    """Use the template fallback when Ollama would likely dilute grounded DB data."""
+    if tool_result.get("skip_ollama"):
+        return True
+    if tool_result.get("cache_required"):
+        return True
+    data = tool_result.get("data_text", "").lower()
+    if any(
+        phrase in data
+        for phrase in (
+            "no department matched",
+            "no employee matched",
+            "no assets matched",
+            "no search query detected",
+            "no employee name detected",
+        )
+    ):
+        return True
+    return False
+
+
+def _validate_ollama_output(ollama_text: str, data_text: str) -> bool:
+    """
+    Validates that the Ollama narrative output does not omit critical database
+    identifiers (asset tags) or health percentages.
+    """
+    if not data_text:
+        return True
+    if not ollama_text:
+        return False
+
+    # 1. Validate Asset Tags
+    tags = re.findall(r"\b[A-Za-z]{2,5}-[A-Za-z]{2,6}-\d{3,5}\b", data_text)
+    for tag in tags:
+        if tag.lower() not in ollama_text.lower():
+            return False
+
+    # 2. Validate Health Percentages (e.g. 4%, 92%)
+    pcts = re.findall(r"(\d+)%", data_text)
+    for pct in pcts:
+        if pct not in ollama_text:
+            return False
+
+    return True

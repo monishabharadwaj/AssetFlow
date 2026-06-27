@@ -108,6 +108,20 @@ class AssetRepository(BaseRepository[Asset]):
     def update(self, asset: Asset, data: dict) -> Asset:
         return self.apply_partial_update(asset, data)
 
+    def list_assigned_to_employee(
+        self, employee_id: uuid.UUID, *, limit: int = 10
+    ) -> list[Asset]:
+        stmt = (
+            select(Asset)
+            .where(
+                Asset.is_active.is_(True),
+                Asset.current_assigned_employee_id == employee_id,
+            )
+            .order_by(Asset.name)
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
     def get_type_names_for_assets(
         self, asset_ids: list[uuid.UUID]
     ) -> dict[str, str]:
