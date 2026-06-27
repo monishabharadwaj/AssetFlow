@@ -34,6 +34,10 @@ WARNING_MAX_SCORE = WARNING_MAX_PCT / 100.0
 MONITOR_MIN_SCORE = MONITOR_MIN_PCT / 100.0
 HEALTHY_MIN_SCORE = HEALTHY_MIN_PCT / 100.0
 
+# Three-tier risk bands (ML inference + fleet APIs). Subset of the five health bands above.
+RISK_LOW_MIN_SCORE = 0.70
+RISK_MEDIUM_MIN_SCORE = 0.50
+
 
 def health_pct(score: float) -> int:
     return int(float(score) * 100)
@@ -66,9 +70,27 @@ def is_monitor(score: float) -> bool:
     return MONITOR_MIN_PCT <= pct < HEALTHY_MIN_PCT
 
 
+def risk_level_from_score(score: float) -> str:
+    """Canonical LOW / MEDIUM / HIGH bands used by ML inference and fleet APIs."""
+    if score >= RISK_LOW_MIN_SCORE:
+        return "LOW"
+    if score >= RISK_MEDIUM_MIN_SCORE:
+        return "MEDIUM"
+    return "HIGH"
+
+
+def is_high_risk(score: float) -> bool:
+    """True when score maps to HIGH risk (health below 50%)."""
+    return risk_level_from_score(score) == "HIGH"
+
+
+def is_medium_risk(score: float) -> bool:
+    return risk_level_from_score(score) == "MEDIUM"
+
+
 def should_notify_high_risk(score: float) -> bool:
-    """Only interrupt operations for genuinely critical fleet health."""
-    return is_critical(score)
+    """Escalation notifications — same HIGH band as dashboard and assistant."""
+    return is_high_risk(score)
 
 
 def should_notify_drift(

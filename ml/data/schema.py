@@ -71,8 +71,6 @@ class TrainingRow:
 
 
 def risk_level_from_score(score: float) -> str:
-    if score >= 0.70:
-        return "LOW"
-    if score >= 0.50:
-        return "MEDIUM"
-    return "HIGH"
+    from app.core.health_thresholds import risk_level_from_score as _canonical
+
+    return _canonical(score)

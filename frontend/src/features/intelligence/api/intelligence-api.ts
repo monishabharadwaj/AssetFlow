@@ -18,6 +18,8 @@ export type MaintenanceRecommendation = {
   asset_id: string;
   asset_tag: string;
   asset_name: string;
+  asset_type_name: string | null;
+  department_name: string | null;
   title: string;
   priority: "HIGH" | "MEDIUM" | "LOW";
   maintenance_type: string;

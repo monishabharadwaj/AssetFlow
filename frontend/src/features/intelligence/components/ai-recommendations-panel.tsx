@@ -86,6 +86,11 @@ export function AiRecommendationsPanel() {
                     <Wrench className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium leading-snug">{item.title}</p>
+                      {(item.asset_type_name || item.department_name) ? (
+                        <p className="mt-0.5 text-xs font-medium text-foreground/80">
+                          {[item.asset_type_name, item.department_name].filter(Boolean).join(" · ")}
+                        </p>
+                      ) : null}
                       <p className="mt-0.5 text-xs text-muted-foreground">{item.rationale}</p>
                     </div>
                     <span

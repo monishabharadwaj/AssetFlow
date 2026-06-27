@@ -59,6 +59,15 @@ class HealthHistoryRepository(BaseRepository[AssetHealthHistory]):
         )
         return self.db.execute(stmt).scalars().first()
 
+    def get_latest_ai_predictions_per_asset(self) -> list[AssetHealthHistory]:
+        stmt = (
+            select(AssetHealthHistory)
+            .where(AssetHealthHistory.prediction_metadata.isnot(None))
+            .distinct(AssetHealthHistory.asset_id)
+            .order_by(AssetHealthHistory.asset_id, AssetHealthHistory.recorded_at.desc())
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
     def get_latest_for_all_assets(self) -> list[AssetHealthHistory]:
         stmt = (
             select(AssetHealthHistory)

@@ -154,14 +154,15 @@ def get_dashboard_service(
     repository: DashboardRepository = Depends(get_dashboard_repository),
     prediction_service: PredictionService = Depends(get_prediction_service),
 ) -> DashboardService:
-    prediction_service.is_cache_warm()
-    return DashboardService(repository)
+    prediction_service.ensure_predictions_loaded()
+    return DashboardService(repository, prediction_service)
 
 
 def get_recommendation_service(
     prediction_service: PredictionService = Depends(get_prediction_service),
     dashboard_repository: DashboardRepository = Depends(get_dashboard_repository),
 ) -> RecommendationService:
+    prediction_service.ensure_predictions_loaded()
     return RecommendationService(prediction_service, dashboard_repository)
 
 
@@ -266,7 +267,9 @@ def get_policy_automation_service(
     asset_repository: AssetRepository = Depends(get_asset_repository),
     dashboard_repository: DashboardRepository = Depends(get_dashboard_repository),
     notification_service: NotificationService = Depends(get_notification_service),
+    prediction_service: PredictionService = Depends(get_prediction_service),
 ) -> PolicyAutomationService:
+    prediction_service.ensure_predictions_loaded()
     return PolicyAutomationService(
         maintenance_repository,
         asset_repository,
@@ -280,6 +283,7 @@ def get_intelligence_pipeline_service(
     drift_service: DriftMonitoringService = Depends(get_drift_monitoring_service),
     policy_service: PolicyAutomationService = Depends(get_policy_automation_service),
 ) -> IntelligencePipelineService:
+    prediction_service.ensure_predictions_loaded()
     return IntelligencePipelineService(
         prediction_service,
         drift_service,

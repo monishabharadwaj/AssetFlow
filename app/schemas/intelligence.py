@@ -21,6 +21,8 @@ class HealthPredictionResponse(BaseModel):
     asset_id: str
     asset_tag: str | None = None
     asset_name: str | None = None
+    asset_type_name: str | None = None
+    department_name: str | None = None
     health_score: float = Field(ge=0, le=1)
     risk_level: RiskLevel
     confidence: float = Field(ge=0, le=1)
@@ -42,6 +44,8 @@ class HighRiskAssetItem(BaseModel):
     asset_id: str
     asset_tag: str
     asset_name: str
+    asset_type_name: str | None = None
+    department_name: str | None = None
     health_score: float
     risk_level: RiskLevel
     predicted_at: datetime

@@ -16,6 +16,8 @@ class MaintenanceRecommendation(BaseModel):
     asset_id: str
     asset_tag: str
     asset_name: str
+    asset_type_name: str | None = None
+    department_name: str | None = None
     title: str
     priority: RecommendationPriority
     maintenance_type: str

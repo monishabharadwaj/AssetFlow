@@ -131,6 +131,10 @@ class DashboardRepository(BaseRepository[Asset]):
         return list(self.db.execute(stmt).scalars().unique().all())
 
     def recent_maintenance(self, limit: int) -> list[MaintenanceRecord]:
+        event_date = func.coalesce(
+            MaintenanceRecord.completed_date,
+            MaintenanceRecord.scheduled_date,
+        )
         stmt = (
             select(MaintenanceRecord)
             .options(
@@ -138,7 +142,27 @@ class DashboardRepository(BaseRepository[Asset]):
                 .load_only(Asset.id, Asset.asset_tag, Asset.name, Asset.updated_at)
                 .options(*_asset_feed_options()),
             )
-            .order_by(MaintenanceRecord.updated_at.desc())
+            .order_by(event_date.desc().nullslast())
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().unique().all())
+
+    def recently_registered_assets(self, limit: int) -> list[Asset]:
+        from app.models.asset import AssetType
+
+        stmt = (
+            select(Asset)
+            .options(
+                joinedload(Asset.asset_type).load_only(AssetType.id, AssetType.name),
+                noload(Asset.allocations),
+                noload(Asset.transfers),
+                noload(Asset.maintenance_records),
+                noload(Asset.health_history),
+                noload(Asset.current_department),
+                noload(Asset.current_assigned_employee),
+            )
+            .where(Asset.is_active.is_(True))
+            .order_by(Asset.purchase_date.desc())
             .limit(limit)
         )
         return list(self.db.execute(stmt).scalars().unique().all())

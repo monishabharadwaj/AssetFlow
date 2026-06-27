@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date, datetime, time, timezone
+
 from app.repositories.dashboard_repository import DashboardRepository
 from app.schemas.dashboard import (
     AttentionItem,
@@ -9,12 +11,17 @@ from app.schemas.dashboard import (
     StatusBreakdownItem,
 )
 from app.services import narrative as narr
-from app.services.prediction_service import get_prediction_cache
+from app.services.prediction_service import PredictionService
 
 
 class DashboardService:
-    def __init__(self, repository: DashboardRepository) -> None:
+    def __init__(
+        self,
+        repository: DashboardRepository,
+        prediction_service: PredictionService,
+    ) -> None:
         self.repository = repository
+        self.prediction_service = prediction_service
 
     def get_summary(self) -> DashboardSummaryResponse:
         total_assets = self.repository.count_assets(active_only=False)
@@ -60,12 +67,12 @@ class DashboardService:
     def _build_attention_items(self) -> list[AttentionItem]:
         items: list[AttentionItem] = []
 
-        for prediction in get_prediction_cache().values():
-            if prediction.risk_level.value != "HIGH":
-                continue
+        for prediction in self.prediction_service.get_all_cached_high_risk():
             headline = f"AI high risk — {prediction.asset_tag}"
             message = narr.high_risk_attention_message(
-                asset_name=prediction.asset_name or prediction.asset_tag or "Asset",
+                asset_tag=prediction.asset_tag or "",
+                asset_type=prediction.asset_type_name,
+                department_name=prediction.department_name,
                 score=prediction.health_score,
                 risk_level=prediction.risk_level.value,
             )
@@ -198,11 +205,26 @@ class DashboardService:
 
         for row in self.repository.recent_maintenance(limit=limit):
             asset = row.asset
-            headline = f"{asset.name} maintenance {row.status.value.replace('_', ' ').lower()}"
+            status = row.status.value
+            event_date = row.completed_date or row.scheduled_date
+            occurred = (
+                datetime.combine(event_date, time(12, 0), tzinfo=timezone.utc)
+                if event_date
+                else row.updated_at
+            )
+            if status == "COMPLETED":
+                activity_type = "MAINTENANCE_COMPLETED"
+                headline = f"{asset.name} maintenance completed"
+            elif status in ("SCHEDULED", "IN_PROGRESS"):
+                activity_type = "MAINTENANCE_SCHEDULED"
+                headline = f"{asset.name} maintenance scheduled"
+            else:
+                activity_type = "MAINTENANCE"
+                headline = f"{asset.name} maintenance {status.replace('_', ' ').lower()}"
             activity.append(
                 RecentActivityItem(
-                    activity_type="MAINTENANCE",
-                    occurred_at=row.updated_at,
+                    activity_type=activity_type,
+                    occurred_at=occurred,
                     asset_id=str(row.asset_id),
                     asset_tag=asset.asset_tag,
                     asset_name=asset.name,
@@ -216,5 +238,59 @@ class DashboardService:
                 )
             )
 
-        activity.sort(key=lambda item: item.occurred_at, reverse=True)
-        return activity[:limit]
+        for asset in self.repository.recently_registered_assets(limit=limit):
+            occurred = datetime.combine(asset.purchase_date, time(9, 0), tzinfo=timezone.utc)
+            type_name = asset.asset_type.name if asset.asset_type else "asset"
+            activity.append(
+                RecentActivityItem(
+                    activity_type="REGISTRATION",
+                    occurred_at=occurred,
+                    asset_id=str(asset.id),
+                    asset_tag=asset.asset_tag,
+                    asset_name=asset.name,
+                    headline=f"{asset.name} added to inventory",
+                    message=(
+                        f"{asset.name} ({asset.asset_tag}) — a {type_name.lower()} — "
+                        "was registered in AssetFlow."
+                    ),
+                )
+            )
+
+        return self._balance_activity(activity, limit=limit)
+
+    @staticmethod
+    def _activity_family(activity_type: str) -> str:
+        if activity_type.startswith("ALLOCATION"):
+            return "ALLOCATION"
+        if activity_type.startswith("MAINTENANCE"):
+            return "MAINTENANCE"
+        return activity_type
+
+    def _balance_activity(
+        self, activity: list[RecentActivityItem], *, limit: int
+    ) -> list[RecentActivityItem]:
+        """Round-robin across event families so the feed stays varied rather than
+        being dominated by whichever event type was most recently timestamped."""
+        families: dict[str, list[RecentActivityItem]] = {}
+        for item in activity:
+            families.setdefault(self._activity_family(item.activity_type), []).append(item)
+        for bucket in families.values():
+            bucket.sort(key=lambda i: i.occurred_at, reverse=True)
+
+        order = sorted(
+            families.keys(),
+            key=lambda f: families[f][0].occurred_at,
+            reverse=True,
+        )
+        selected: list[RecentActivityItem] = []
+        idx = 0
+        while len(selected) < limit and any(families.values()):
+            family = order[idx % len(order)]
+            bucket = families[family]
+            if bucket:
+                selected.append(bucket.pop(0))
+            idx += 1
+            if idx > limit * len(order) * 2:
+                break
+        selected.sort(key=lambda i: i.occurred_at, reverse=True)
+        return selected[:limit]
