@@ -17,7 +17,7 @@ import { Select } from "../../../shared/components/ui/select";
 import { formatDate } from "../../../shared/lib/format";
 import { useUrlSearchParams } from "../../../shared/hooks/use-url-search-params";
 import type { Allocation, Employee, EmployeeCreate } from "../../../shared/api/types";
-import { createUserAccount, listUserAccounts } from "../../auth/api";
+import { createUserAccount, listUserAccounts, resetUserPassword, updateUserAccount } from "../../auth/api";
 import type { UserRole } from "../../auth/types";
 import { usePermissions } from "../../auth/use-permissions";
 import { useDepartmentsList } from "../../departments/hooks/use-departments";
@@ -60,7 +60,7 @@ export function EmployeesPageContent() {
     email: "",
     job_title: "",
   });
-  const [accountPassword, setAccountPassword] = useState("Welcome123");
+  const [accountPassword, setAccountPassword] = useState("");
   const [accountRole, setAccountRole] = useState<UserRole>("VIEWER");
   const [createAccountOnSave, setCreateAccountOnSave] = useState(true);
 
@@ -80,7 +80,7 @@ export function EmployeesPageContent() {
       job_title: "",
     });
     setCreateAccountOnSave(canManageUsers);
-    setAccountPassword("Welcome123");
+    setAccountPassword("");
     setAccountRole("VIEWER");
     setFormOpen(true);
   };
@@ -100,9 +100,39 @@ export function EmployeesPageContent() {
 
   const openGrantAccess = (emp: Employee) => {
     setAccountEmployee(emp);
-    setAccountPassword("Welcome123");
+    setAccountPassword("");
     setAccountRole("VIEWER");
     setAccountOpen(true);
+  };
+
+  const handleResetPassword = async (userId: string) => {
+    try {
+      const result = await resetUserPassword(userId);
+      toast(`Temporary password: ${result.temporary_password} (user must change on next login)`);
+      void accountsQuery.refetch();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to reset password", "error");
+    }
+  };
+
+  const handleToggleAccount = async (userId: string, isActive: boolean) => {
+    try {
+      await updateUserAccount(userId, { is_active: !isActive });
+      toast(isActive ? "Account disabled" : "Account reactivated");
+      void accountsQuery.refetch();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update account", "error");
+    }
+  };
+
+  const handleRoleChange = async (userId: string, role: UserRole) => {
+    try {
+      await updateUserAccount(userId, { role });
+      toast(`Role updated to ${role}`);
+      void accountsQuery.refetch();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update role", "error");
+    }
   };
 
   const handleSubmit = async () => {
@@ -110,18 +140,22 @@ export function EmployeesPageContent() {
       if (editEmp) {
         await update.mutateAsync({ id: editEmp.id, data: form });
         toast("Employee updated");
-      } else if (canManageUsers && createAccountOnSave && accountPassword) {
-        await createUserAccount({
+      } else if (canManageUsers && createAccountOnSave) {
+        const result = await createUserAccount({
           first_name: form.first_name,
           last_name: form.last_name,
           email: form.email,
           employee_code: form.employee_code,
           department_id: form.department_id,
           job_title: form.job_title || undefined,
-          password: accountPassword,
+          password: accountPassword || undefined,
           role: accountRole,
         });
-        toast("Employee and login account created");
+        if (result.temporary_password) {
+          toast(`Employee created. Temporary password: ${result.temporary_password}`);
+        } else {
+          toast("Employee and login account created");
+        }
         void accountsQuery.refetch();
       } else {
         await create.mutateAsync(form);
@@ -136,12 +170,16 @@ export function EmployeesPageContent() {
   const handleGrantAccess = async () => {
     if (!accountEmployee) return;
     try {
-      await createUserAccount({
+      const result = await createUserAccount({
         employee_id: accountEmployee.id,
-        password: accountPassword,
+        password: accountPassword || undefined,
         role: accountRole,
       });
-      toast("Login account created");
+      if (result.temporary_password) {
+        toast(`Login created. Temporary password: ${result.temporary_password}`);
+      } else {
+        toast("Login account created");
+      }
       setAccountOpen(false);
       void accountsQuery.refetch();
     } catch (err) {
@@ -173,7 +211,7 @@ export function EmployeesPageContent() {
       header: "Access",
       cell: (r) => {
         const account = accountByEmployeeId.get(r.id);
-        return account ? `${account.role}` : "No login";
+        return account ? `${account.role}${account.is_active ? "" : " (disabled)"}` : "No login";
       },
     },
     {
@@ -188,6 +226,31 @@ export function EmployeesPageContent() {
             <Button variant="ghost" size="icon" onClick={() => openGrantAccess(r)} aria-label="Grant login access">
               <KeyRound className="h-4 w-4" />
             </Button>
+          ) : null}
+          {canManageUsers && accountByEmployeeId.has(r.id) ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => void handleResetPassword(accountByEmployeeId.get(r.id)!.id)}>
+                Reset pwd
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleToggleAccount(accountByEmployeeId.get(r.id)!.id, accountByEmployeeId.get(r.id)!.is_active)}
+              >
+                {accountByEmployeeId.get(r.id)!.is_active ? "Disable" : "Enable"}
+              </Button>
+              <Select
+                value={accountByEmployeeId.get(r.id)!.role}
+                onChange={(e) => void handleRoleChange(accountByEmployeeId.get(r.id)!.id, e.target.value as UserRole)}
+                className="h-8 w-28"
+              >
+                {ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </Select>
+            </>
           ) : null}
           {canWrite ? (
             <>
@@ -334,11 +397,12 @@ export function EmployeesPageContent() {
               {createAccountOnSave ? (
                 <>
                   <div className="space-y-2">
-                    <Label>Initial Password</Label>
+                    <Label>Initial password (optional — auto-generated if blank)</Label>
                     <Input
                       type="password"
                       value={accountPassword}
                       onChange={(e) => setAccountPassword(e.target.value)}
+                      placeholder="Leave blank to auto-generate"
                     />
                   </div>
                   <div className="space-y-2">
@@ -372,11 +436,12 @@ export function EmployeesPageContent() {
             Create a login for {accountEmployee?.first_name} {accountEmployee?.last_name} ({accountEmployee?.email}).
           </p>
           <div className="space-y-2">
-            <Label>Password</Label>
+            <Label>Password (optional — auto-generated if blank)</Label>
             <Input
               type="password"
               value={accountPassword}
               onChange={(e) => setAccountPassword(e.target.value)}
+              placeholder="Leave blank to auto-generate"
             />
           </div>
           <div className="space-y-2">

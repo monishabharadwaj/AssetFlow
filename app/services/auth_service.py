@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from app.core.enums import UserRole
+from app.core.password_policy import generate_temporary_password, validate_password_strength
 from app.core.security import create_access_token, hash_password, verify_password
 from app.exceptions.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.models.employee import Employee
@@ -8,7 +9,15 @@ from app.models.user import User
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.employee_repository import EmployeeRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.auth import LoginRequest, TokenResponse, UserCreate, UserResponse
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    LoginRequest,
+    TokenResponse,
+    UserAdminUpdate,
+    UserCreate,
+    UserCreateResponse,
+    UserResponse,
+)
 
 
 def user_to_response(user: User) -> UserResponse:
@@ -18,6 +27,7 @@ def user_to_response(user: User) -> UserResponse:
         id=user.id,
         role=user.role,
         is_active=user.is_active,
+        must_change_password=user.must_change_password,
         created_at=user.created_at,
         employee_id=employee.id,
         email=employee.email,
@@ -53,7 +63,10 @@ class AuthService:
             raise BusinessRuleError("Account is inactive")
 
         token = create_access_token(subject=user.id, role=user.role.value)
-        return TokenResponse(access_token=token)
+        return TokenResponse(
+            access_token=token,
+            must_change_password=user.must_change_password,
+        )
 
     def get_user(self, user_id: UUID) -> UserResponse:
         user = self.repository.get_by_id(user_id)
@@ -64,22 +77,71 @@ class AuthService:
     def list_users(self) -> list[UserResponse]:
         return [user_to_response(user) for user in self.repository.list_all()]
 
-    def create_user(self, data: UserCreate) -> UserResponse:
+    def create_user(self, data: UserCreate) -> UserCreateResponse:
         employee = self._resolve_employee(data)
         if self.repository.get_by_employee_id(employee.id) is not None:
             raise ConflictError(f"Employee '{employee.employee_code}' already has a login account")
 
+        temporary_password = data.password or generate_temporary_password()
+        validate_password_strength(temporary_password)
+
         user = User(
             employee_id=employee.id,
-            hashed_password=hash_password(data.password),
+            hashed_password=hash_password(temporary_password),
             role=data.role,
             is_active=True,
+            must_change_password=True,
         )
         created = self.repository.create(user)
         self.repository.commit()
         loaded = self.repository.get_by_id(created.id)
         assert loaded is not None
-        return user_to_response(loaded)
+        response = user_to_response(loaded)
+        return UserCreateResponse(
+            **response.model_dump(),
+            temporary_password=temporary_password if data.password is None else None,
+        )
+
+    def change_password(self, user: User, data: ChangePasswordRequest) -> UserResponse:
+        if not verify_password(data.current_password, user.hashed_password):
+            raise BusinessRuleError("Current password is incorrect")
+        if verify_password(data.new_password, user.hashed_password):
+            raise BusinessRuleError("New password must be different from the current password")
+
+        user.hashed_password = hash_password(data.new_password)
+        user.must_change_password = False
+        self.repository.commit()
+        refreshed = self.repository.get_by_id(user.id)
+        assert refreshed is not None
+        return user_to_response(refreshed)
+
+    def reset_password(self, user_id: UUID) -> tuple[UserResponse, str]:
+        user = self.repository.get_by_id(user_id)
+        if user is None:
+            raise NotFoundError("User", str(user_id))
+
+        temporary_password = generate_temporary_password()
+        user.hashed_password = hash_password(temporary_password)
+        user.must_change_password = True
+        self.repository.commit()
+        refreshed = self.repository.get_by_id(user_id)
+        assert refreshed is not None
+        return user_to_response(refreshed), temporary_password
+
+    def update_user_admin(self, user_id: UUID, data: UserAdminUpdate) -> UserResponse:
+        user = self.repository.get_by_id(user_id)
+        if user is None:
+            raise NotFoundError("User", str(user_id))
+
+        if data.role is not None:
+            user.role = data.role
+        if data.is_active is not None:
+            user.is_active = data.is_active
+
+        self.repository.commit()
+        refreshed = self.repository.get_by_id(user_id)
+        assert refreshed is not None
+        return user_to_response(refreshed)
 
     def _resolve_employee(self, data: UserCreate) -> Employee:
         if data.employee_id is not None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from app.core.access_scope import AccessContext
 from app.exceptions.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.models.employee import Employee
 from app.repositories.employee_repository import EmployeeRepository
@@ -41,10 +42,12 @@ class EmployeeService:
         self.repository.refresh(employee)
         return EmployeeResponse.model_validate(employee)
 
-    def get_by_id(self, employee_id: uuid.UUID) -> EmployeeResponse:
+    def get_by_id(self, employee_id: uuid.UUID, scope: AccessContext | None = None) -> EmployeeResponse:
         employee = self.repository.get_by_id(employee_id)
         if not employee:
             raise NotFoundError("Employee", str(employee_id))
+        if scope is not None:
+            scope.assert_department_access(employee.department_id)
         return EmployeeResponse.model_validate(employee)
 
     def list(
@@ -55,7 +58,14 @@ class EmployeeService:
         department_id: uuid.UUID | None = None,
         is_active: bool | None = None,
         search: str | None = None,
+        scope: AccessContext | None = None,
     ) -> PaginatedResponse[EmployeeResponse]:
+        if scope is not None:
+            scoped = scope.scoping_department_id()
+            if scoped is not None:
+                if department_id is not None and department_id != scoped:
+                    raise BusinessRuleError("You do not have access to employees in that department")
+                department_id = scoped
         items, total = self.repository.list(
             page=page,
             page_size=page_size,

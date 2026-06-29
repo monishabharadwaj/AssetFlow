@@ -39,15 +39,18 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="mt-auto border-t px-3 py-3">
-        {user?.role === "ADMIN" ? (
-          <button
-            type="button"
-            className="mb-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent"
-          >
-            <Settings className="h-4 w-4" />
-            Settings
-          </button>
-        ) : null}
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            cn(
+              "mb-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
+              isActive ? "bg-accent text-foreground" : "text-muted-foreground",
+            )
+          }
+        >
+          <Settings className="h-4 w-4" />
+          Account settings
+        </NavLink>
         <Button type="button" variant="ghost" className="w-full justify-start" onClick={logout}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign out

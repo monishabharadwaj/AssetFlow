@@ -65,7 +65,9 @@ def assert_api_permission(user: User, method: str, path: str) -> None:
         )
 
     if role == UserRole.MANAGER:
-        if any(rel.startswith(prefix) for prefix in _ADMIN_WRITE_PREFIXES):
+        if method in ("POST", "PUT", "PATCH", "DELETE") and any(
+            rel.startswith(prefix) or rel.startswith(f"{prefix}/") for prefix in _ADMIN_WRITE_PREFIXES
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Managers cannot modify organizational or user-administration data",

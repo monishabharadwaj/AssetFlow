@@ -41,7 +41,7 @@ from app.services.recommendation_service import RecommendationService
 from app.services.root_cause_service import RootCauseService
 from app.services.timeline_service import TimelineService
 from app.services.transfer_service import TransferService
-
+from app.services.workspace_service import WorkspaceService
 
 
 def get_department_repository(db: Session = Depends(get_db)) -> DepartmentRepository:
@@ -221,6 +221,20 @@ def get_notification_service(
     repository: NotificationRepository = Depends(get_notification_repository),
 ) -> NotificationService:
     return NotificationService(repository)
+
+
+def get_workspace_service(
+    dashboard_repository: DashboardRepository = Depends(get_dashboard_repository),
+    asset_repository: AssetRepository = Depends(get_asset_repository),
+    notification_repository: NotificationRepository = Depends(get_notification_repository),
+    employee_repository: EmployeeRepository = Depends(get_employee_repository),
+) -> WorkspaceService:
+    return WorkspaceService(
+        dashboard_repository,
+        asset_repository,
+        notification_repository,
+        employee_repository,
+    )
 
 
 def get_cost_optimization_service(

@@ -8,6 +8,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.access_scope import AccessContext, access_context_from_user
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.enums import UserRole
@@ -82,12 +83,25 @@ async def get_current_user(
     return user
 
 
+async def enforce_password_changed(user: User = Depends(get_current_user)) -> User:
+    if user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You must change your password before accessing the application",
+        )
+    return user
+
+
 async def enforce_rbac(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(enforce_password_changed),
 ) -> User:
     assert_api_permission(user, request.method, request.url.path)
     return user
+
+
+def get_access_context(user: User = Depends(get_current_user)) -> AccessContext:
+    return access_context_from_user(user)
 
 
 def require_roles(*roles: UserRole):

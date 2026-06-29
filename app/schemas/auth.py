@@ -1,9 +1,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.core.enums import UserRole
+from app.core.password_policy import validate_password_strength
 
 
 class LoginRequest(BaseModel):
@@ -14,6 +15,7 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    must_change_password: bool = False
 
 
 class UserResponse(BaseModel):
@@ -22,6 +24,7 @@ class UserResponse(BaseModel):
     id: UUID
     role: UserRole
     is_active: bool
+    must_change_password: bool
     created_at: datetime
     employee_id: UUID
     email: str
@@ -33,7 +36,7 @@ class UserResponse(BaseModel):
 
 
 class UserCreate(BaseModel):
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
     role: UserRole = UserRole.VIEWER
     employee_id: UUID | None = None
     first_name: str | None = Field(default=None, min_length=1, max_length=100)
@@ -42,6 +45,14 @@ class UserCreate(BaseModel):
     employee_code: str | None = Field(default=None, min_length=1, max_length=50)
     department_id: UUID | None = None
     job_title: str | None = Field(default=None, max_length=100)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        validate_password_strength(value)
+        return value
 
     @model_validator(mode="after")
     def validate_employee_source(self) -> "UserCreate":
@@ -62,3 +73,34 @@ class UserCreate(BaseModel):
                     "Provide employee_id or all of: first_name, last_name, email, employee_code, department_id"
                 )
         return self
+
+
+class UserCreateResponse(UserResponse):
+    temporary_password: str | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, value: str) -> str:
+        validate_password_strength(value)
+        return value
+
+
+class UserAdminUpdate(BaseModel):
+    role: UserRole | None = None
+    is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> "UserAdminUpdate":
+        if self.role is None and self.is_active is None:
+            raise ValueError("At least one field must be provided")
+        return self
+
+
+class PasswordResetResponse(BaseModel):
+    user: UserResponse
+    temporary_password: str

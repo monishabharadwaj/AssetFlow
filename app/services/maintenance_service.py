@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from app.core.access_scope import AccessContext
 from app.core.enums import AssetStatus, MaintenanceStatus
 from app.exceptions.errors import NotFoundError
 from app.models.maintenance import MaintenanceRecord
@@ -27,8 +28,10 @@ class MaintenanceService:
         self.repository = repository
         self.asset_service = asset_service
 
-    def create(self, asset_id: uuid.UUID, data: MaintenanceCreate) -> MaintenanceResponse:
-        self.asset_service.get_active_asset(asset_id)
+    def create(
+        self, asset_id: uuid.UUID, data: MaintenanceCreate, scope: AccessContext | None = None
+    ) -> MaintenanceResponse:
+        self.asset_service.get_active_asset(asset_id, scope)
 
         record = MaintenanceRecord(
             asset_id=asset_id,
@@ -51,10 +54,14 @@ class MaintenanceService:
         self.repository.refresh(record)
         return MaintenanceResponse.model_validate(record)
 
-    def get_by_id(self, record_id: uuid.UUID) -> MaintenanceResponse:
+    def get_by_id(
+        self, record_id: uuid.UUID, scope: AccessContext | None = None
+    ) -> MaintenanceResponse:
         record = self.repository.get_by_id(record_id)
         if not record:
             raise NotFoundError("MaintenanceRecord", str(record_id))
+        if scope is not None:
+            self.asset_service.get_active_asset(record.asset_id, scope)
         return MaintenanceResponse.model_validate(record)
 
     def list_by_asset(
@@ -63,8 +70,9 @@ class MaintenanceService:
         *,
         page: int,
         page_size: int,
+        scope: AccessContext | None = None,
     ) -> PaginatedResponse[MaintenanceResponse]:
-        self.asset_service.get_by_id(asset_id)
+        self.asset_service.get_by_id(asset_id, scope)
         items, total = self.repository.list_by_asset(asset_id, page=page, page_size=page_size)
         return PaginatedResponse.create(
             items=[MaintenanceResponse.model_validate(item) for item in items],
@@ -78,8 +86,12 @@ class MaintenanceService:
         *,
         page: int,
         page_size: int,
+        scope: AccessContext | None = None,
     ) -> PaginatedResponse[MaintenanceWorkQueueItem]:
-        rows, total = self.repository.list_due(page=page, page_size=page_size)
+        department_id = scope.scoping_department_id() if scope else None
+        rows, total = self.repository.list_due(
+            page=page, page_size=page_size, department_id=department_id
+        )
         items = [
             MaintenanceWorkQueueItem(
                 record=MaintenanceResponse.model_validate(record),
@@ -96,10 +108,14 @@ class MaintenanceService:
             page_size=page_size,
         )
 
-    def update(self, record_id: uuid.UUID, data: MaintenanceUpdate) -> MaintenanceResponse:
+    def update(
+        self, record_id: uuid.UUID, data: MaintenanceUpdate, scope: AccessContext | None = None
+    ) -> MaintenanceResponse:
         record = self.repository.get_by_id(record_id)
         if not record:
             raise NotFoundError("MaintenanceRecord", str(record_id))
+        if scope is not None:
+            self.asset_service.get_active_asset(record.asset_id, scope)
 
         old_status = record.status
         update_data = data.model_dump(exclude_unset=True)

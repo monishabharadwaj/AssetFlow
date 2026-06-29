@@ -72,30 +72,29 @@ class MaintenanceRepository(BaseRepository[MaintenanceRecord]):
         *,
         page: int,
         page_size: int,
+        department_id: uuid.UUID | None = None,
     ) -> tuple[list[tuple[MaintenanceRecord, Asset]], int]:
         today = date.today()
+        filters = [
+            MaintenanceRecord.status.in_(
+                [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
+            ),
+            MaintenanceRecord.scheduled_date.is_not(None),
+            MaintenanceRecord.scheduled_date <= today,
+        ]
+        if department_id is not None:
+            filters.append(Asset.current_department_id == department_id)
+
         base = (
             select(MaintenanceRecord, Asset)
             .join(Asset, Asset.id == MaintenanceRecord.asset_id)
-            .where(
-                MaintenanceRecord.status.in_(
-                    [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
-                ),
-                MaintenanceRecord.scheduled_date.is_not(None),
-                MaintenanceRecord.scheduled_date <= today,
-            )
+            .where(*filters)
         )
         count_stmt = (
             select(func.count())
             .select_from(MaintenanceRecord)
             .join(Asset, Asset.id == MaintenanceRecord.asset_id)
-            .where(
-                MaintenanceRecord.status.in_(
-                    [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
-                ),
-                MaintenanceRecord.scheduled_date.is_not(None),
-                MaintenanceRecord.scheduled_date <= today,
-            )
+            .where(*filters)
         )
         total = self.db.execute(count_stmt).scalar_one()
         offset = (page - 1) * page_size

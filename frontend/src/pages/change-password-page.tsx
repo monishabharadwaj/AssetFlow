@@ -12,30 +12,40 @@ import {
 import { Input } from "../shared/components/ui/input";
 import { Label } from "../shared/components/ui/label";
 import { useAuth } from "../features/auth/auth-context";
+import { PASSWORD_POLICY_HINT } from "../features/auth/types";
 
-export function LoginPage() {
-  const { login, user } = useAuth();
+export function ChangePasswordPage() {
+  const { user, changePassword } = useAuth();
   const location = useLocation();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const redirectTo =
     (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/dashboard";
 
-  if (user) {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user.must_change_password) {
     return <Navigate to={redirectTo} replace />;
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match");
+      return;
+    }
     setSubmitting(true);
     try {
-      await login(email.trim(), password);
+      await changePassword({ current_password: currentPassword, new_password: newPassword });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Failed to change password");
     } finally {
       setSubmitting(false);
     }
@@ -45,40 +55,47 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign in to AssetFlow AI</CardTitle>
+          <CardTitle>Set your password</CardTitle>
           <CardDescription>
-            Sign in with your employee email. New accounts receive a unique temporary password and must
-            set a personal password on first login.
+            For security, you must choose a new password before using AssetFlow AI.
+            {PASSWORD_POLICY_HINT}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="email">Work email</Label>
+              <Label htmlFor="current">Temporary / current password</Label>
               <Input
-                id="email"
-                type="email"
-                autoComplete="username"
-                placeholder="firstname.lastname@assetflow.app"
-                value={email}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEmail(event.target.value)}
+                id="current"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="new">New password</Label>
               <Input
-                id="password"
+                id="new"
                 type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setPassword(event.target.value)}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm">Confirm new password</Label>
+              <Input
+                id="confirm"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 required
               />
             </div>
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Signing in…" : "Sign in"}
+              {submitting ? "Saving…" : "Save password and continue"}
             </Button>
           </form>
         </CardContent>

@@ -699,5 +699,9 @@ def run_seed(db: Session, profile: SeedProfile, *, reset: bool = False) -> dict[
     )
     account_info = ensure_employee_accounts(db)
     counts.update(account_info)
+    if account_info.get("sample_credentials"):
+        print("Sample login credentials (unique temp passwords — change on first login):")
+        for line in account_info["sample_credentials"]:
+            print(f"  {line}")
     counts["profile"] = profile.name
     return counts

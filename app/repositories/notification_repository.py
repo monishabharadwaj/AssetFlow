@@ -42,6 +42,22 @@ class NotificationRepository(BaseRepository[Notification]):
         self.flush()
         return notification
 
+    def list_for_assets(
+        self,
+        asset_ids: list[uuid.UUID],
+        *,
+        limit: int = 10,
+    ) -> list[Notification]:
+        if not asset_ids:
+            return []
+        stmt = (
+            select(Notification)
+            .where(Notification.asset_id.in_(asset_ids))
+            .order_by(Notification.created_at.desc())
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
     def mark_all_read(self) -> int:
         stmt = select(Notification).where(Notification.is_read.is_(False))
         items = list(self.db.execute(stmt).scalars().all())

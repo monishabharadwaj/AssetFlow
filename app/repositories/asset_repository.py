@@ -42,6 +42,7 @@ class AssetRepository(BaseRepository[Asset]):
         page: int,
         page_size: int,
         is_active: bool | None = None,
+        department_id: uuid.UUID | None = None,
     ) -> tuple[list[Asset], int]:
         stmt = select(Asset)
         count_stmt = select(func.count()).select_from(Asset)
@@ -49,6 +50,10 @@ class AssetRepository(BaseRepository[Asset]):
         if is_active is not None:
             stmt = stmt.where(Asset.is_active == is_active)
             count_stmt = count_stmt.where(Asset.is_active == is_active)
+
+        if department_id is not None:
+            stmt = stmt.where(Asset.current_department_id == department_id)
+            count_stmt = count_stmt.where(Asset.current_department_id == department_id)
 
         total = self.db.execute(count_stmt).scalar_one()
         offset = (page - 1) * page_size

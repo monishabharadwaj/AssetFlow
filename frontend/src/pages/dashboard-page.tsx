@@ -4,11 +4,14 @@ import { AttentionQueue } from "../features/dashboard/components/attention-queue
 import { CompactMetricsStrip } from "../features/dashboard/components/compact-metrics-strip";
 import { DashboardError } from "../features/dashboard/components/dashboard-error";
 import { DashboardSkeleton } from "../features/dashboard/components/dashboard-skeleton";
+import { MyWorkspacePanel } from "../features/dashboard/components/my-workspace-panel";
 import { AiRecommendationsPanel } from "../features/intelligence/components/ai-recommendations-panel";
 import { QuickActionsPanel } from "../features/dashboard/components/quick-actions-panel";
+import { useAuth } from "../features/auth/auth-context";
 import { useDashboardSummary } from "../features/dashboard/hooks/use-dashboard-summary";
 
 export function DashboardPage() {
+  const { user } = useAuth();
   const { data, isLoading, isError, error, refetch } = useDashboardSummary();
 
   if (isLoading) {
@@ -35,9 +38,13 @@ export function DashboardPage() {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Operations Center</h2>
         <p className="text-sm text-muted-foreground">
-          What needs attention and what just happened — analytics are secondary
+          {user?.role === "ADMIN"
+            ? "Organization-wide operations and attention queue"
+            : `${user?.department_name ?? "Department"} operations and your assigned assets`}
         </p>
       </div>
+
+      <MyWorkspacePanel />
 
       <CompactMetricsStrip summary={data} />
 

@@ -16,7 +16,8 @@ export type Permission =
   | "dashboard:read"
   | "assistant:use"
   | "intelligence:run"
-  | "notifications:write";
+  | "notifications:write"
+  | "settings:read";
 
 const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   ADMIN: new Set([
@@ -34,6 +35,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "assistant:use",
     "intelligence:run",
     "notifications:write",
+    "settings:read",
   ]),
   MANAGER: new Set([
     "departments:read",
@@ -47,6 +49,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "assistant:use",
     "intelligence:run",
     "notifications:write",
+    "settings:read",
   ]),
   VIEWER: new Set([
     "assets:read",
@@ -55,6 +58,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "dashboard:read",
     "assistant:use",
     "notifications:write",
+    "settings:read",
   ]),
 };
 
@@ -74,6 +78,7 @@ const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/departments": "departments:read",
   "/employees": "employees:read",
   "/reports": "reports:read",
+  "/settings": "settings:read",
 };
 
 export function hasPermission(role: UserRole | undefined, permission: Permission): boolean {

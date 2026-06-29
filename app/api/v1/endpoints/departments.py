@@ -2,7 +2,9 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query, status
 
+from app.api.auth_deps import get_access_context
 from app.api.deps import get_department_service
+from app.core.access_scope import AccessContext
 from app.schemas.department import (
     DepartmentCreate,
     DepartmentListResponse,
@@ -28,17 +30,19 @@ def list_departments(
     page_size: int = Query(default=20, ge=1, le=100),
     is_active: bool | None = Query(default=None),
     search: str | None = Query(default=None),
+    scope: AccessContext = Depends(get_access_context),
     service: DepartmentService = Depends(get_department_service),
 ) -> DepartmentListResponse:
-    return service.list(page=page, page_size=page_size, is_active=is_active, search=search)
+    return service.list(page=page, page_size=page_size, is_active=is_active, search=search, scope=scope)
 
 
 @router.get("/{department_id}", response_model=DepartmentResponse)
 def get_department(
     department_id: uuid.UUID,
+    scope: AccessContext = Depends(get_access_context),
     service: DepartmentService = Depends(get_department_service),
 ) -> DepartmentResponse:
-    return service.get_by_id(department_id)
+    return service.get_by_id(department_id, scope)
 
 
 @router.patch("/{department_id}", response_model=DepartmentResponse)

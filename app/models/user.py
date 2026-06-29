@@ -29,5 +29,6 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         default=UserRole.VIEWER,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     employee: Mapped["Employee"] = relationship(back_populates="user", lazy="joined")

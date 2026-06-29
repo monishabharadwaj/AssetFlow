@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import date
 
 from sqlalchemy import func, select
@@ -43,16 +44,20 @@ def _employee_feed_options():
 
 
 class DashboardRepository(BaseRepository[Asset]):
-    def count_assets(self, *, active_only: bool = False) -> int:
+    def count_assets(self, *, active_only: bool = False, department_id: uuid.UUID | None = None) -> int:
         stmt = select(func.count()).select_from(Asset)
         if active_only:
             stmt = stmt.where(Asset.is_active.is_(True))
+        if department_id is not None:
+            stmt = stmt.where(Asset.current_department_id == department_id)
         return self.db.execute(stmt).scalar_one()
 
-    def count_employees(self, *, active_only: bool = False) -> int:
+    def count_employees(self, *, active_only: bool = False, department_id: uuid.UUID | None = None) -> int:
         stmt = select(func.count()).select_from(Employee)
         if active_only:
             stmt = stmt.where(Employee.is_active.is_(True))
+        if department_id is not None:
+            stmt = stmt.where(Employee.department_id == department_id)
         return self.db.execute(stmt).scalar_one()
 
     def count_departments(self, *, active_only: bool = False) -> int:
@@ -61,30 +66,33 @@ class DashboardRepository(BaseRepository[Asset]):
             stmt = stmt.where(Department.is_active.is_(True))
         return self.db.execute(stmt).scalar_one()
 
-    def assets_by_status(self) -> list[tuple[str, int]]:
+    def assets_by_status(self, *, department_id: uuid.UUID | None = None) -> list[tuple[str, int]]:
         stmt = (
             select(Asset.current_status, func.count())
             .where(Asset.is_active.is_(True))
-            .group_by(Asset.current_status)
-            .order_by(Asset.current_status)
         )
+        if department_id is not None:
+            stmt = stmt.where(Asset.current_department_id == department_id)
+        stmt = stmt.group_by(Asset.current_status).order_by(Asset.current_status)
         return [(status.value, count) for status, count in self.db.execute(stmt).all()]
 
-    def assets_by_department(self) -> list[tuple[str, str, int]]:
+    def assets_by_department(self, *, department_id: uuid.UUID | None = None) -> list[tuple[str, str, int]]:
         stmt = (
             select(Department.id, Department.name, func.count(Asset.id))
             .join(Asset, Asset.current_department_id == Department.id)
             .where(Asset.is_active.is_(True))
-            .group_by(Department.id, Department.name)
-            .order_by(func.count(Asset.id).desc(), Department.name)
         )
+        if department_id is not None:
+            stmt = stmt.where(Department.id == department_id)
+        stmt = stmt.group_by(Department.id, Department.name).order_by(func.count(Asset.id).desc(), Department.name)
         rows = self.db.execute(stmt).all()
         return [(str(dep_id), dep_name, count) for dep_id, dep_name, count in rows]
 
-    def maintenance_due_count(self) -> int:
+    def maintenance_due_count(self, *, department_id: uuid.UUID | None = None) -> int:
         stmt = (
             select(func.count())
             .select_from(MaintenanceRecord)
+            .join(Asset, MaintenanceRecord.asset_id == Asset.id)
             .where(
                 MaintenanceRecord.status.in_(
                     [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
@@ -93,6 +101,8 @@ class DashboardRepository(BaseRepository[Asset]):
                 MaintenanceRecord.scheduled_date <= date.today(),
             )
         )
+        if department_id is not None:
+            stmt = stmt.where(Asset.current_department_id == department_id)
         return self.db.execute(stmt).scalar_one()
 
     def recent_allocations(self, limit: int) -> list[AssetAllocation]:
@@ -337,3 +347,35 @@ class DashboardRepository(BaseRepository[Asset]):
             .limit(limit)
         )
         return list(self.db.execute(stmt).scalars().all())
+
+    def list_assigned_assets(self, employee_id: uuid.UUID, *, limit: int = 20) -> list[Asset]:
+        stmt = (
+            select(Asset)
+            .options(*_asset_feed_options())
+            .where(
+                Asset.is_active.is_(True),
+                Asset.current_assigned_employee_id == employee_id,
+            )
+            .order_by(Asset.name)
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
+    def list_upcoming_maintenance_for_assets(
+        self, asset_ids: list[uuid.UUID], *, limit: int = 10
+    ) -> list[tuple[MaintenanceRecord, Asset]]:
+        if not asset_ids:
+            return []
+        stmt = (
+            select(MaintenanceRecord, Asset)
+            .join(Asset, MaintenanceRecord.asset_id == Asset.id)
+            .where(
+                MaintenanceRecord.asset_id.in_(asset_ids),
+                MaintenanceRecord.status.in_(
+                    [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
+                ),
+            )
+            .order_by(MaintenanceRecord.scheduled_date.asc().nullslast())
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).all())

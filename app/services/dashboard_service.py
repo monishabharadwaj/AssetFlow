@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import uuid
 from datetime import date, datetime, time, timezone
 
+from app.core.access_scope import AccessContext
 from app.repositories.dashboard_repository import DashboardRepository
 from app.schemas.dashboard import (
     AttentionItem,
@@ -23,17 +25,27 @@ class DashboardService:
         self.repository = repository
         self.prediction_service = prediction_service
 
-    def get_summary(self) -> DashboardSummaryResponse:
-        total_assets = self.repository.count_assets(active_only=False)
-        total_active_assets = self.repository.count_assets(active_only=True)
-        total_employees = self.repository.count_employees(active_only=False)
-        total_active_employees = self.repository.count_employees(active_only=True)
-        total_departments = self.repository.count_departments(active_only=False)
-        total_active_departments = self.repository.count_departments(active_only=True)
+    def get_summary(self, scope: AccessContext | None = None) -> DashboardSummaryResponse:
+        department_id = scope.scoping_department_id() if scope else None
+
+        total_assets = self.repository.count_assets(active_only=False, department_id=department_id)
+        total_active_assets = self.repository.count_assets(active_only=True, department_id=department_id)
+        total_employees = self.repository.count_employees(active_only=False, department_id=department_id)
+        total_active_employees = self.repository.count_employees(active_only=True, department_id=department_id)
+        total_departments = (
+            1
+            if department_id is not None
+            else self.repository.count_departments(active_only=False)
+        )
+        total_active_departments = (
+            1
+            if department_id is not None
+            else self.repository.count_departments(active_only=True)
+        )
 
         assets_by_status = [
             StatusBreakdownItem(status=status, count=count)
-            for status, count in self.repository.assets_by_status()
+            for status, count in self.repository.assets_by_status(department_id=department_id)
         ]
 
         assets_by_department = [
@@ -42,13 +54,15 @@ class DashboardService:
                 department_name=department_name,
                 count=count,
             )
-            for department_id, department_name, count in self.repository.assets_by_department()
+            for department_id, department_name, count in self.repository.assets_by_department(
+                department_id=department_id
+            )
         ]
 
-        maintenance_due_count = self.repository.maintenance_due_count()
+        maintenance_due_count = self.repository.maintenance_due_count(department_id=department_id)
 
-        recent_activity = self._build_recent_activity(limit=15)
-        attention_items = self._build_attention_items()
+        recent_activity = self._build_recent_activity(limit=15, department_id=department_id)
+        attention_items = self._build_attention_items(department_id=department_id)
 
         return DashboardSummaryResponse(
             total_assets=total_assets,
@@ -64,10 +78,12 @@ class DashboardService:
             attention_items=attention_items,
         )
 
-    def _build_attention_items(self) -> list[AttentionItem]:
+    def _build_attention_items(self, department_id: uuid.UUID | None = None) -> list[AttentionItem]:
         items: list[AttentionItem] = []
 
         for prediction in self.prediction_service.get_all_cached_high_risk():
+            if department_id is not None and str(getattr(prediction, "department_id", "")) != str(department_id):
+                continue
             headline = f"AI high risk — {prediction.asset_tag}"
             message = narr.high_risk_attention_message(
                 asset_tag=prediction.asset_tag or "",
@@ -90,6 +106,8 @@ class DashboardService:
             )
 
         for record, asset in self.repository.maintenance_due_items(limit=8):
+            if department_id is not None and asset.current_department_id != department_id:
+                continue
             headline = f"Maintenance overdue — {asset.asset_tag}"
             message = narr.maintenance_attention_message(
                 asset_name=asset.name,
@@ -109,6 +127,8 @@ class DashboardService:
             )
 
         for asset in self.repository.assets_in_maintenance(limit=6):
+            if department_id is not None and asset.current_department_id != department_id:
+                continue
             headline = f"In maintenance — {asset.asset_tag}"
             message = narr.in_maintenance_attention_message(
                 asset_name=asset.name,
@@ -128,6 +148,8 @@ class DashboardService:
             )
 
         for asset in self.repository.available_assignable_laptops(limit=4):
+            if department_id is not None and asset.current_department_id != department_id:
+                continue
             headline = f"Ready to assign — {asset.asset_tag}"
             message = narr.available_attention_message(
                 asset_name=asset.name,
@@ -150,11 +172,15 @@ class DashboardService:
         items.sort(key=lambda i: priority_order.get(i.priority, 3))
         return items[:12]
 
-    def _build_recent_activity(self, *, limit: int) -> list[RecentActivityItem]:
+    def _build_recent_activity(
+        self, *, limit: int, department_id: uuid.UUID | None = None
+    ) -> list[RecentActivityItem]:
         activity: list[RecentActivityItem] = []
 
         for row in self.repository.recent_allocations(limit=limit):
             asset = row.asset
+            if department_id is not None and asset.current_department_id != department_id:
+                continue
             employee = row.employee
             emp_name = narr.employee_display(employee.first_name, employee.last_name)
             headline = narr.allocation_headline(
@@ -182,6 +208,8 @@ class DashboardService:
 
         for row in self.repository.recent_transfers(limit=limit):
             asset = row.asset
+            if department_id is not None and asset.current_department_id != department_id:
+                continue
             from_name = row.from_department.name
             to_name = row.to_department.name
             headline = f"{asset.name} transferred to {to_name}"
@@ -205,6 +233,8 @@ class DashboardService:
 
         for row in self.repository.recent_maintenance(limit=limit):
             asset = row.asset
+            if department_id is not None and asset.current_department_id != department_id:
+                continue
             status = row.status.value
             event_date = row.completed_date or row.scheduled_date
             occurred = (

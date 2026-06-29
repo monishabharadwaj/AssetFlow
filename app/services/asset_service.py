@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from app.core.enums import AssetStatus
+from app.core.access_scope import AccessContext
 from app.exceptions.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.models.asset import Asset
 from app.repositories.asset_repository import AssetRepository
@@ -26,7 +27,23 @@ class AssetService:
         self.repository = repository
         self.department_service = department_service
 
-    def create(self, data: AssetCreate) -> AssetResponse:
+    @staticmethod
+    def _effective_department_id(
+        scope: AccessContext | None,
+        requested_department_id: uuid.UUID | None = None,
+    ) -> uuid.UUID | None:
+        if scope is None:
+            return requested_department_id
+        scoped = scope.scoping_department_id()
+        if scoped is None:
+            return requested_department_id
+        if requested_department_id is not None and requested_department_id != scoped:
+            raise BusinessRuleError("You do not have access to assets in that department")
+        return scoped
+
+    def create(self, data: AssetCreate, scope: AccessContext | None = None) -> AssetResponse:
+        if scope is not None:
+            scope.assert_department_access(data.current_department_id)
         self.department_service.get_active_department(data.current_department_id)
 
         if not self.repository.get_asset_type(data.asset_type_id):
@@ -56,16 +73,20 @@ class AssetService:
         self.repository.refresh(asset)
         return AssetResponse.model_validate(asset)
 
-    def get_by_id(self, asset_id: uuid.UUID) -> AssetResponse:
+    def get_by_id(self, asset_id: uuid.UUID, scope: AccessContext | None = None) -> AssetResponse:
         asset = self.repository.get_by_id(asset_id)
         if not asset:
             raise NotFoundError("Asset", str(asset_id))
+        if scope is not None:
+            scope.assert_asset_access(asset)
         return AssetResponse.model_validate(asset)
 
-    def get_active_asset(self, asset_id: uuid.UUID) -> Asset:
+    def get_active_asset(self, asset_id: uuid.UUID, scope: AccessContext | None = None) -> Asset:
         asset = self.repository.get_by_id(asset_id)
         if not asset:
             raise NotFoundError("Asset", str(asset_id))
+        if scope is not None:
+            scope.assert_asset_access(asset)
         if not asset.is_active:
             raise BusinessRuleError("Asset is inactive")
         return asset
@@ -76,8 +97,15 @@ class AssetService:
         page: int,
         page_size: int,
         is_active: bool | None = None,
+        scope: AccessContext | None = None,
     ) -> PaginatedResponse[AssetResponse]:
-        items, total = self.repository.list(page=page, page_size=page_size, is_active=is_active)
+        department_id = self._effective_department_id(scope)
+        items, total = self.repository.list(
+            page=page,
+            page_size=page_size,
+            is_active=is_active,
+            department_id=department_id,
+        )
         return PaginatedResponse.create(
             items=[AssetResponse.model_validate(item) for item in items],
             total=total,
@@ -96,7 +124,9 @@ class AssetService:
         current_status: AssetStatus | None = None,
         current_department_id: uuid.UUID | None = None,
         current_location: str | None = None,
+        scope: AccessContext | None = None,
     ) -> PaginatedResponse[AssetResponse]:
+        effective_department_id = self._effective_department_id(scope, current_department_id)
         items, total = self.repository.search(
             page=page,
             page_size=page_size,
@@ -104,7 +134,7 @@ class AssetService:
             asset_tag=asset_tag,
             serial_number=serial_number,
             current_status=current_status,
-            current_department_id=current_department_id,
+            current_department_id=effective_department_id,
             current_location=current_location,
         )
         return PaginatedResponse.create(
@@ -114,14 +144,20 @@ class AssetService:
             page_size=page_size,
         )
 
-    def update(self, asset_id: uuid.UUID, data: AssetUpdate) -> AssetResponse:
+    def update(
+        self, asset_id: uuid.UUID, data: AssetUpdate, scope: AccessContext | None = None
+    ) -> AssetResponse:
         asset = self.repository.get_by_id(asset_id)
         if not asset:
             raise NotFoundError("Asset", str(asset_id))
+        if scope is not None:
+            scope.assert_asset_access(asset)
 
         update_data = data.model_dump(exclude_unset=True)
 
         if "current_department_id" in update_data:
+            if scope is not None:
+                scope.assert_department_access(update_data["current_department_id"])
             self.department_service.get_active_department(update_data["current_department_id"])
 
         if "asset_type_id" in update_data:
@@ -138,10 +174,12 @@ class AssetService:
         self.repository.refresh(asset)
         return AssetResponse.model_validate(asset)
 
-    def deactivate(self, asset_id: uuid.UUID) -> AssetResponse:
+    def deactivate(self, asset_id: uuid.UUID, scope: AccessContext | None = None) -> AssetResponse:
         asset = self.repository.get_by_id(asset_id)
         if not asset:
             raise NotFoundError("Asset", str(asset_id))
+        if scope is not None:
+            scope.assert_asset_access(asset)
 
         if not asset.is_active:
             return AssetResponse.model_validate(asset)

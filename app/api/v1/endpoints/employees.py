@@ -2,7 +2,9 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query, status
 
+from app.api.auth_deps import get_access_context
 from app.api.deps import get_employee_service
+from app.core.access_scope import AccessContext
 from app.schemas.employee import (
     EmployeeCreate,
     EmployeeListResponse,
@@ -29,6 +31,7 @@ def list_employees(
     department_id: uuid.UUID | None = Query(default=None),
     is_active: bool | None = Query(default=None),
     search: str | None = Query(default=None),
+    scope: AccessContext = Depends(get_access_context),
     service: EmployeeService = Depends(get_employee_service),
 ) -> EmployeeListResponse:
     return service.list(
@@ -37,15 +40,17 @@ def list_employees(
         department_id=department_id,
         is_active=is_active,
         search=search,
+        scope=scope,
     )
 
 
 @router.get("/{employee_id}", response_model=EmployeeResponse)
 def get_employee(
     employee_id: uuid.UUID,
+    scope: AccessContext = Depends(get_access_context),
     service: EmployeeService = Depends(get_employee_service),
 ) -> EmployeeResponse:
-    return service.get_by_id(employee_id)
+    return service.get_by_id(employee_id, scope)
 
 
 @router.patch("/{employee_id}", response_model=EmployeeResponse)

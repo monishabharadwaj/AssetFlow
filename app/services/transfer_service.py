@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from app.core.access_scope import AccessContext
 from app.core.enums import AssetStatus
 from app.exceptions.errors import BusinessRuleError
 from app.models.transfer import AssetTransfer
@@ -23,13 +24,17 @@ class TransferService:
         self.asset_service = asset_service
         self.department_service = department_service
 
-    def create(self, asset_id: uuid.UUID, data: TransferCreate) -> TransferResponse:
-        asset = self.asset_service.get_active_asset(asset_id)
+    def create(
+        self, asset_id: uuid.UUID, data: TransferCreate, scope: AccessContext | None = None
+    ) -> TransferResponse:
+        asset = self.asset_service.get_active_asset(asset_id, scope)
 
         if asset.current_status in (AssetStatus.RETIRED, AssetStatus.DISPOSED):
             raise BusinessRuleError("Cannot transfer a retired or disposed asset")
 
         self.department_service.get_active_department(data.to_department_id)
+        if scope is not None and not scope.is_org_wide:
+            scope.assert_department_access(data.to_department_id)
 
         if (
             asset.current_department_id == data.to_department_id
@@ -65,8 +70,9 @@ class TransferService:
         *,
         page: int,
         page_size: int,
+        scope: AccessContext | None = None,
     ) -> PaginatedResponse[TransferResponse]:
-        self.asset_service.get_by_id(asset_id)
+        self.asset_service.get_by_id(asset_id, scope)
         items, total = self.repository.list_by_asset(asset_id, page=page, page_size=page_size)
         return PaginatedResponse.create(
             items=[TransferResponse.model_validate(item) for item in items],

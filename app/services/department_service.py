@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from app.core.access_scope import AccessContext
 from app.exceptions.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.models.department import Department
 from app.repositories.department_repository import DepartmentRepository
@@ -29,10 +30,12 @@ class DepartmentService:
         self.repository.refresh(department)
         return DepartmentResponse.model_validate(department)
 
-    def get_by_id(self, department_id: uuid.UUID) -> DepartmentResponse:
+    def get_by_id(self, department_id: uuid.UUID, scope: AccessContext | None = None) -> DepartmentResponse:
         department = self.repository.get_by_id(department_id)
         if not department:
             raise NotFoundError("Department", str(department_id))
+        if scope is not None:
+            scope.assert_department_access(department_id)
         return DepartmentResponse.model_validate(department)
 
     def list(
@@ -42,7 +45,20 @@ class DepartmentService:
         page_size: int,
         is_active: bool | None = None,
         search: str | None = None,
+        scope: AccessContext | None = None,
     ) -> PaginatedResponse[DepartmentResponse]:
+        if scope is not None:
+            scoped = scope.scoping_department_id()
+            if scoped is not None:
+                department = self.repository.get_by_id(scoped)
+                if department is None:
+                    return PaginatedResponse.create(items=[], total=0, page=page, page_size=page_size)
+                return PaginatedResponse.create(
+                    items=[DepartmentResponse.model_validate(department)],
+                    total=1,
+                    page=1,
+                    page_size=page_size,
+                )
         items, total = self.repository.list(
             page=page,
             page_size=page_size,

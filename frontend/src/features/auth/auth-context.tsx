@@ -8,15 +8,21 @@ import {
   type ReactNode,
 } from "react";
 
-import { fetchCurrentUser, loginRequest } from "./api";
-import type { AuthUser } from "./types";
+import {
+  changePasswordRequest,
+  fetchCurrentUser,
+  loginRequest,
+} from "./api";
+import type { AuthUser, ChangePasswordRequest } from "./types";
 import { clearAuthToken, getAuthToken, setAuthToken } from "../../shared/api/client";
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
+  changePassword: (body: ChangePasswordRequest) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -24,6 +30,11 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshUser = useCallback(async () => {
+    const currentUser = await fetchCurrentUser();
+    setUser(currentUser);
+  }, []);
 
   const logout = useCallback(() => {
     clearAuthToken();
@@ -35,6 +46,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(tokenResponse.access_token);
     const currentUser = await fetchCurrentUser();
     setUser(currentUser);
+    return currentUser.must_change_password;
+  }, []);
+
+  const changePassword = useCallback(async (body: ChangePasswordRequest) => {
+    const updated = await changePasswordRequest(body);
+    setUser(updated);
   }, []);
 
   useEffect(() => {
@@ -54,8 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, logout }),
-    [user, loading, login, logout],
+    () => ({ user, loading, login, logout, refreshUser, changePassword }),
+    [user, loading, login, logout, refreshUser, changePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from app.core.access_scope import AccessContext
 from app.core.enums import AllocationAction, AssetStatus
 from app.exceptions.errors import BusinessRuleError
 from app.models.allocation import AssetAllocation
@@ -29,12 +30,16 @@ class AllocationService:
         self.asset_service = asset_service
         self.employee_service = employee_service
 
-    def assign(self, asset_id: uuid.UUID, data: AllocationAssignRequest) -> AllocationResponse:
-        asset = self.asset_service.get_active_asset(asset_id)
+    def assign(
+        self, asset_id: uuid.UUID, data: AllocationAssignRequest, scope: AccessContext | None = None
+    ) -> AllocationResponse:
+        asset = self.asset_service.get_active_asset(asset_id, scope)
         if asset.current_status != AssetStatus.AVAILABLE:
             raise BusinessRuleError("Asset must be AVAILABLE to assign")
 
-        self.employee_service.get_active_employee(data.employee_id)
+        employee = self.employee_service.get_active_employee(data.employee_id)
+        if scope is not None and not scope.is_org_wide:
+            scope.assert_department_access(employee.department_id)
 
         allocation = AssetAllocation(
             asset_id=asset_id,
@@ -54,8 +59,10 @@ class AllocationService:
         self.repository.refresh(allocation)
         return AllocationResponse.model_validate(allocation)
 
-    def return_asset(self, asset_id: uuid.UUID, data: AllocationReturnRequest) -> AllocationResponse:
-        asset = self.asset_service.get_active_asset(asset_id)
+    def return_asset(
+        self, asset_id: uuid.UUID, data: AllocationReturnRequest, scope: AccessContext | None = None
+    ) -> AllocationResponse:
+        asset = self.asset_service.get_active_asset(asset_id, scope)
         if asset.current_status != AssetStatus.ASSIGNED:
             raise BusinessRuleError("Asset must be ASSIGNED to return")
 
@@ -86,15 +93,19 @@ class AllocationService:
         self.repository.refresh(allocation)
         return AllocationResponse.model_validate(allocation)
 
-    def reassign(self, asset_id: uuid.UUID, data: AllocationReassignRequest) -> AllocationResponse:
-        asset = self.asset_service.get_active_asset(asset_id)
+    def reassign(
+        self, asset_id: uuid.UUID, data: AllocationReassignRequest, scope: AccessContext | None = None
+    ) -> AllocationResponse:
+        asset = self.asset_service.get_active_asset(asset_id, scope)
         if asset.current_status != AssetStatus.ASSIGNED:
             raise BusinessRuleError("Asset must be ASSIGNED to reassign")
 
         if asset.current_assigned_employee_id == data.employee_id:
             raise BusinessRuleError("Asset is already assigned to this employee")
 
-        self.employee_service.get_active_employee(data.employee_id)
+        employee = self.employee_service.get_active_employee(data.employee_id)
+        if scope is not None and not scope.is_org_wide:
+            scope.assert_department_access(employee.department_id)
 
         open_allocation = self.repository.get_open_allocation(asset_id)
         if open_allocation and open_allocation.returned_at is None:
@@ -124,8 +135,9 @@ class AllocationService:
         *,
         page: int,
         page_size: int,
+        scope: AccessContext | None = None,
     ) -> PaginatedResponse[AllocationResponse]:
-        self.asset_service.get_by_id(asset_id)
+        self.asset_service.get_by_id(asset_id, scope)
         items, total = self.repository.list_by_asset(asset_id, page=page, page_size=page_size)
         return PaginatedResponse.create(
             items=[AllocationResponse.model_validate(item) for item in items],
@@ -140,8 +152,9 @@ class AllocationService:
         *,
         page: int,
         page_size: int,
+        scope: AccessContext | None = None,
     ) -> PaginatedResponse[AllocationResponse]:
-        self.employee_service.get_by_id(employee_id)
+        self.employee_service.get_by_id(employee_id, scope)
         items, total = self.repository.list_by_employee(
             employee_id, page=page, page_size=page_size
         )
