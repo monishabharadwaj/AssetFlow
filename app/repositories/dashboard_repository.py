@@ -177,14 +177,17 @@ class DashboardRepository(BaseRepository[Asset]):
         )
         return list(self.db.execute(stmt).scalars().unique().all())
 
-    def maintenance_due_items(self, limit: int = 10) -> list[tuple[MaintenanceRecord, Asset]]:
+    def maintenance_due_items(
+        self, limit: int = 10, *, department_id: uuid.UUID | None = None
+    ) -> list[tuple[MaintenanceRecord, Asset]]:
         stmt = (
             select(MaintenanceRecord)
             .options(
                 joinedload(MaintenanceRecord.asset)
-                .load_only(Asset.id, Asset.asset_tag, Asset.name)
+                .load_only(Asset.id, Asset.asset_tag, Asset.name, Asset.current_department_id)
                 .options(*_asset_feed_options()),
             )
+            .join(Asset, Asset.id == MaintenanceRecord.asset_id)
             .where(
                 MaintenanceRecord.status.in_(
                     [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
@@ -192,9 +195,10 @@ class DashboardRepository(BaseRepository[Asset]):
                 MaintenanceRecord.scheduled_date.is_not(None),
                 MaintenanceRecord.scheduled_date <= date.today(),
             )
-            .order_by(MaintenanceRecord.scheduled_date.asc())
-            .limit(limit)
         )
+        if department_id is not None:
+            stmt = stmt.where(Asset.current_department_id == department_id)
+        stmt = stmt.order_by(MaintenanceRecord.scheduled_date.asc()).limit(limit)
         records = self.db.execute(stmt).scalars().all()
         return [(r, r.asset) for r in records]
 
@@ -249,7 +253,9 @@ class DashboardRepository(BaseRepository[Asset]):
         )
         return self.db.execute(stmt).scalar_one()
 
-    def warranty_expiring_soon(self, *, within_days: int = 30, limit: int = 10) -> list[Asset]:
+    def warranty_expiring_soon(
+        self, *, within_days: int = 30, limit: int = 10, department_id: uuid.UUID | None = None
+    ) -> list[Asset]:
         from datetime import timedelta
 
         cutoff = date.today() + timedelta(days=within_days)
@@ -261,9 +267,10 @@ class DashboardRepository(BaseRepository[Asset]):
                 Asset.warranty_expiry <= cutoff,
                 Asset.warranty_expiry >= date.today(),
             )
-            .order_by(Asset.warranty_expiry.asc())
-            .limit(limit)
         )
+        if department_id is not None:
+            stmt = stmt.where(Asset.current_department_id == department_id)
+        stmt = stmt.order_by(Asset.warranty_expiry.asc()).limit(limit)
         return list(self.db.execute(stmt).scalars().all())
 
     def maintenance_scheduled_this_week(

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Bot, LogOut, ScanLine, Search } from "lucide-react";
 
 import { AssistantPanel } from "../../features/assistant/components/assistant-panel";
+import { NotificationsBell } from "../../features/operations/components/notifications-bell";
 import { useAuth } from "../../features/auth/auth-context";
 import { QrScannerDialog } from "../../features/assets/components/qr-scanner-dialog";
 import { SearchCommand } from "../../shared/components/search-command";
@@ -32,6 +33,7 @@ export function Header() {
             >
               <Search className="h-4 w-4" />
             </Button>
+            <NotificationsBell />
             <Button
               type="button"
               variant="secondary"

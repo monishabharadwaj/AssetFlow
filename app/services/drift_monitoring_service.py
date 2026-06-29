@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import uuid
+
 from app.core.config import settings
 from app.core.health_thresholds import should_notify_drift
+from app.repositories.asset_repository import AssetRepository
 from app.repositories.health_history_repository import HealthHistoryRepository
 from app.schemas.intelligence import HealthPredictionResponse
 from app.schemas.operations import DriftAlert, DriftStatusResponse
@@ -9,15 +12,33 @@ from app.services.prediction_service import get_prediction_cache
 
 
 class DriftMonitoringService:
-    def __init__(self, health_history_repository: HealthHistoryRepository) -> None:
+    def __init__(
+        self,
+        health_history_repository: HealthHistoryRepository,
+        asset_repository: AssetRepository,
+    ) -> None:
         self.health_history_repository = health_history_repository
+        self.asset_repository = asset_repository
 
-    def detect_drift(self, *, threshold: float | None = None) -> DriftStatusResponse:
+    def detect_drift(
+        self,
+        *,
+        threshold: float | None = None,
+        department_id: uuid.UUID | None = None,
+    ) -> DriftStatusResponse:
         min_drop = threshold if threshold is not None else settings.drift_min_drop
         alerts: list[DriftAlert] = []
         cache = get_prediction_cache()
+        allowed_ids: set[uuid.UUID] | None = None
+        if department_id is not None:
+            allowed_ids = self.asset_repository.filter_ids_by_department(
+                [uuid.UUID(p.asset_id) for p in cache.values()],
+                department_id,
+            )
 
         for prediction in cache.values():
+            if allowed_ids is not None and uuid.UUID(prediction.asset_id) not in allowed_ids:
+                continue
             alert = self._check_prediction_drift(prediction, min_drop=min_drop)
             if alert is not None:
                 alerts.append(alert)
@@ -31,8 +52,6 @@ class DriftMonitoringService:
         *,
         min_drop: float,
     ) -> DriftAlert | None:
-        import uuid
-
         asset_id = uuid.UUID(prediction.asset_id)
         previous = self.health_history_repository.get_latest_for_asset(asset_id)
         if previous is None or previous.health_score is None:

@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../shared/components/ui/card";
-import { Input } from "../shared/components/ui/input";
+import { PasswordInput } from "../shared/components/ui/password-input";
 import { Label } from "../shared/components/ui/label";
 import { useAuth } from "../features/auth/auth-context";
 import { PASSWORD_POLICY_HINT } from "../features/auth/types";
@@ -75,9 +75,8 @@ export function SettingsPage() {
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="current">Current password</Label>
-              <Input
+              <PasswordInput
                 id="current"
-                type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
@@ -85,9 +84,8 @@ export function SettingsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="new">New password</Label>
-              <Input
+              <PasswordInput
                 id="new"
-                type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
@@ -95,9 +93,8 @@ export function SettingsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm">Confirm new password</Label>
-              <Input
+              <PasswordInput
                 id="confirm"
-                type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required

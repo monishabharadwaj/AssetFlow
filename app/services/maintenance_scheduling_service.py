@@ -1,15 +1,31 @@
 from __future__ import annotations
 
+import uuid
+
+from app.repositories.asset_repository import AssetRepository
 from app.schemas.operations import MaintenanceScheduleResponse, MaintenanceWindowSuggestion
 from app.services.prediction_service import get_prediction_cache
 
 
 class MaintenanceSchedulingService:
-    def suggest_windows(self, *, limit: int = 10) -> MaintenanceScheduleResponse:
+    def __init__(self, asset_repository: AssetRepository) -> None:
+        self.asset_repository = asset_repository
+
+    def suggest_windows(
+        self, *, limit: int = 10, department_id: uuid.UUID | None = None
+    ) -> MaintenanceScheduleResponse:
         items: list[MaintenanceWindowSuggestion] = []
         cache = get_prediction_cache()
+        allowed_ids: set[uuid.UUID] | None = None
+        if department_id is not None:
+            allowed_ids = self.asset_repository.filter_ids_by_department(
+                [uuid.UUID(p.asset_id) for p in cache.values()],
+                department_id,
+            )
 
         for prediction in cache.values():
+            if allowed_ids is not None and uuid.UUID(prediction.asset_id) not in allowed_ids:
+                continue
             features = prediction.prediction_metadata.get("input_features", {})
             utilization = float(features.get("utilization_rate", 0.5))
             days_since = int(features.get("days_since_last_maintenance", 0))
@@ -48,28 +64,18 @@ class MaintenanceSchedulingService:
     ) -> tuple[str, int, str]:
         if risk_level == "HIGH":
             return (
-                "Next available low-traffic window (within 3–5 days)",
-                5,
-                f"{asset_name} is high risk with {int(utilization * 100)}% utilization — "
-                f"schedule urgent service during off-peak hours.",
+                "Immediate (within 7 days)",
+                7,
+                f"{asset_name} is high risk with {days_since_maint} days since last service.",
             )
-        if utilization > 0.8:
+        if risk_level == "MEDIUM" or utilization > 0.6:
             return (
-                "Weekend or after-hours slot",
+                "Next 2 weeks",
                 14,
-                f"{asset_name} runs at {int(utilization * 100)}% utilization — "
-                f"avoid weekday downtime; book a low-load maintenance window.",
-            )
-        if days_since_maint > 180:
-            return (
-                "Standard business-hours slot",
-                10,
-                f"{asset_name} is due for service ({days_since_maint} days since last maintenance) "
-                f"and can be serviced during normal hours.",
+                f"Schedule during low-utilization window; utilization at {utilization:.0%}.",
             )
         return (
-            "Flexible — next 2–3 weeks",
-            21,
-            f"{asset_name} has moderate utilization ({int(utilization * 100)}%) — "
-            f"plan preventive maintenance in the next maintenance cycle.",
+            "Next month",
+            30,
+            f"Routine preventive window; {days_since_maint} days since last maintenance.",
         )

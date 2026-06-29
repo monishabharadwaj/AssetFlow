@@ -2,11 +2,13 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query
 
+from app.api.auth_deps import get_access_context
 from app.api.deps import (
     get_prediction_service,
     get_recommendation_service,
     get_root_cause_service,
 )
+from app.core.access_scope import AccessContext
 from app.schemas.explanation import RootCauseResponse
 from app.schemas.intelligence import (
     BatchScoreResponse,
@@ -61,9 +63,10 @@ def prediction_cache_status(
 @router.get("/intelligence/recommendations", response_model=RecommendationListResponse)
 def list_recommendations(
     limit: int = Query(default=10, ge=1, le=50),
+    scope: AccessContext = Depends(get_access_context),
     service: RecommendationService = Depends(get_recommendation_service),
 ) -> RecommendationListResponse:
-    return service.list_recommendations(limit=limit)
+    return service.list_recommendations(limit=limit, scope=scope)
 
 
 @router.get(

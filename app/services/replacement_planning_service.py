@@ -19,14 +19,18 @@ class ReplacementPlanningService:
         self.asset_repository = asset_repository
         self.maintenance_repository = maintenance_repository
 
-    def build_plan(self, *, limit: int = 15) -> ReplacementPlanResponse:
+    def build_plan(
+        self, *, limit: int = 15, department_id: uuid.UUID | None = None
+    ) -> ReplacementPlanResponse:
         items: list[ReplacementPlanItem] = []
         cache = get_prediction_cache()
         today = date.today()
         page = 1
 
         while len(items) < limit:
-            assets, total = self.asset_repository.list(page=page, page_size=100, is_active=True)
+            assets, total = self.asset_repository.list(
+                page=page, page_size=100, is_active=True, department_id=department_id
+            )
             if not assets:
                 break
             for asset in assets:

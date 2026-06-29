@@ -1,16 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "../shared/components/ui/card";
+import { ReportsPageContent } from "../features/reports/components/reports-page-content";
 
 export function ReportsPage() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Reports</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Placeholder route for future analytics/reporting modules.
-        </p>
-      </CardContent>
-    </Card>
-  );
+  return <ReportsPageContent />;
 }

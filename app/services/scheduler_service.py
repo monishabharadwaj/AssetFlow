@@ -42,6 +42,7 @@ def _run_pipeline_sync() -> None:
         dept_service = DepartmentService(dept_repo)
         asset_service = AssetService(asset_repo, dept_service)
         health_service = HealthHistoryService(health_repo, asset_service)
+        notif_service = NotificationService(notif_repo, asset_repo)
         prediction_service = PredictionService(
             asset_service,
             FeatureEngineeringService(),
@@ -52,12 +53,12 @@ def _run_pipeline_sync() -> None:
         )
         pipeline = IntelligencePipelineService(
             prediction_service,
-            DriftMonitoringService(health_repo),
+            DriftMonitoringService(health_repo, asset_repo),
             PolicyAutomationService(
                 maint_repo,
                 asset_repo,
                 dash_repo,
-                NotificationService(notif_repo),
+                notif_service,
             ),
         )
         result = pipeline.run_full_pipeline(persist=True)

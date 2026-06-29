@@ -12,6 +12,7 @@ import { FormDialog } from "../../../shared/components/feedback/form-dialog";
 import { useToast } from "../../../shared/components/feedback/toast-provider";
 import { Button } from "../../../shared/components/ui/button";
 import { Input } from "../../../shared/components/ui/input";
+import { PasswordInput } from "../../../shared/components/ui/password-input";
 import { Label } from "../../../shared/components/ui/label";
 import { Select } from "../../../shared/components/ui/select";
 import { formatDate } from "../../../shared/lib/format";
@@ -398,8 +399,7 @@ export function EmployeesPageContent() {
                 <>
                   <div className="space-y-2">
                     <Label>Initial password (optional — auto-generated if blank)</Label>
-                    <Input
-                      type="password"
+                    <PasswordInput
                       value={accountPassword}
                       onChange={(e) => setAccountPassword(e.target.value)}
                       placeholder="Leave blank to auto-generate"
@@ -437,8 +437,7 @@ export function EmployeesPageContent() {
           </p>
           <div className="space-y-2">
             <Label>Password (optional — auto-generated if blank)</Label>
-            <Input
-              type="password"
+            <PasswordInput
               value={accountPassword}
               onChange={(e) => setAccountPassword(e.target.value)}
               placeholder="Leave blank to auto-generate"

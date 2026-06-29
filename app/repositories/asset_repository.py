@@ -18,6 +18,19 @@ class AssetRepository(BaseRepository[Asset]):
     def get_by_id(self, asset_id: uuid.UUID) -> Asset | None:
         return self.db.get(Asset, asset_id)
 
+    def filter_ids_by_department(
+        self,
+        asset_ids: list[uuid.UUID],
+        department_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        if not asset_ids:
+            return set()
+        stmt = select(Asset.id).where(
+            Asset.id.in_(asset_ids),
+            Asset.current_department_id == department_id,
+        )
+        return set(self.db.execute(stmt).scalars().all())
+
     def get_by_tag(self, asset_tag: str) -> Asset | None:
         stmt = select(Asset).where(Asset.asset_tag == asset_tag)
         return self.db.execute(stmt).scalar_one_or_none()

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 
+from app.core.access_scope import AccessContext
 from app.core.config import settings
+from app.repositories.asset_repository import AssetRepository
 from app.schemas.operations import OperationalReportResponse
 from app.services import narrative as narr
 from app.services.cost_optimization_service import CostOptimizationService
@@ -22,27 +25,40 @@ class ReportService:
         drift_service: DriftMonitoringService,
         replacement_service: ReplacementPlanningService,
         cost_service: CostOptimizationService,
+        asset_repository: AssetRepository,
     ) -> None:
         self.dashboard = dashboard_service
         self.recommendations = recommendation_service
         self.drift = drift_service
         self.replacement = replacement_service
         self.cost = cost_service
+        self.asset_repository = asset_repository
 
-    async def generate_weekly_brief(self, *, use_llm: bool = False) -> OperationalReportResponse:
+    async def generate_weekly_brief(
+        self, *, use_llm: bool = False, scope: AccessContext | None = None
+    ) -> OperationalReportResponse:
         generated_at = datetime.now(timezone.utc)
-        summary_data = self.dashboard.get_summary()
-        recs = self.recommendations.list_recommendations(limit=5)
-        drift = self.drift.detect_drift()
-        replacements = self.replacement.build_plan(limit=3)
-        costs = self.cost.analyze(limit=3)
+        department_id = scope.scoping_department_id() if scope else None
+        summary_data = self.dashboard.get_summary(scope)
+        recs = self.recommendations.list_recommendations(limit=5, scope=scope)
+        drift = self.drift.detect_drift(department_id=department_id)
+        replacements = self.replacement.build_plan(limit=3, department_id=department_id)
+        costs = self.cost.analyze(limit=3, department_id=department_id)
         cache = get_prediction_cache()
-        high_risk_count = sum(1 for p in cache.values() if p.risk_level.value == "HIGH")
+        if department_id is not None:
+            allowed = self.asset_repository.filter_ids_by_department(
+                [uuid.UUID(p.asset_id) for p in cache.values()],
+                department_id,
+            )
+            scoped_cache = [p for p in cache.values() if uuid.UUID(p.asset_id) in allowed]
+        else:
+            scoped_cache = list(cache.values())
+        high_risk_count = sum(1 for p in scoped_cache if p.risk_level.value == "HIGH")
 
         sections = [
             f"Fleet: {summary_data.total_active_assets} active assets, "
             f"{summary_data.maintenance_due_count} overdue maintenance items.",
-            f"AI scoring: {len(cache)} assets scored, {high_risk_count} high risk.",
+            f"AI scoring: {len(scoped_cache)} assets scored, {high_risk_count} high risk.",
             f"Drift alerts: {drift.total} assets with significant health decline.",
         ]
         if recs.items:
@@ -96,6 +112,6 @@ class ReportService:
                 "high_risk_assets": high_risk_count,
                 "maintenance_due": summary_data.maintenance_due_count,
                 "drift_alerts": drift.total,
-                "scored_assets": len(cache),
+                "scored_assets": len(scoped_cache),
             },
         )

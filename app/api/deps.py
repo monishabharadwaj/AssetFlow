@@ -30,6 +30,7 @@ from app.services.cost_optimization_service import CostOptimizationService
 from app.services.drift_monitoring_service import DriftMonitoringService
 from app.services.replacement_planning_service import ReplacementPlanningService
 from app.services.report_service import ReportService
+from app.services.reports_analytics_service import ReportsAnalyticsService
 from app.services.maintenance_scheduling_service import MaintenanceSchedulingService
 from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.policy_automation_service import PolicyAutomationService
@@ -161,9 +162,10 @@ def get_dashboard_service(
 def get_recommendation_service(
     prediction_service: PredictionService = Depends(get_prediction_service),
     dashboard_repository: DashboardRepository = Depends(get_dashboard_repository),
+    asset_repository: AssetRepository = Depends(get_asset_repository),
 ) -> RecommendationService:
     prediction_service.ensure_predictions_loaded()
-    return RecommendationService(prediction_service, dashboard_repository)
+    return RecommendationService(prediction_service, dashboard_repository, asset_repository)
 
 
 def get_assistant_tools(
@@ -219,8 +221,9 @@ def get_notification_repository(db: Session = Depends(get_db)) -> NotificationRe
 
 def get_notification_service(
     repository: NotificationRepository = Depends(get_notification_repository),
+    asset_repository: AssetRepository = Depends(get_asset_repository),
 ) -> NotificationService:
-    return NotificationService(repository)
+    return NotificationService(repository, asset_repository)
 
 
 def get_workspace_service(
@@ -246,8 +249,9 @@ def get_cost_optimization_service(
 
 def get_drift_monitoring_service(
     health_history_repository: HealthHistoryRepository = Depends(get_health_history_repository),
+    asset_repository: AssetRepository = Depends(get_asset_repository),
 ) -> DriftMonitoringService:
-    return DriftMonitoringService(health_history_repository)
+    return DriftMonitoringService(health_history_repository, asset_repository)
 
 
 def get_replacement_planning_service(
@@ -263,6 +267,7 @@ def get_report_service(
     drift_service: DriftMonitoringService = Depends(get_drift_monitoring_service),
     replacement_service: ReplacementPlanningService = Depends(get_replacement_planning_service),
     cost_service: CostOptimizationService = Depends(get_cost_optimization_service),
+    asset_repository: AssetRepository = Depends(get_asset_repository),
 ) -> ReportService:
     return ReportService(
         dashboard_service,
@@ -270,19 +275,14 @@ def get_report_service(
         drift_service,
         replacement_service,
         cost_service,
+        asset_repository,
     )
 
 
-def get_maintenance_scheduling_service() -> MaintenanceSchedulingService:
-    return MaintenanceSchedulingService()
-
-
-def get_knowledge_graph_service(
-    asset_service: AssetService = Depends(get_asset_service),
+def get_maintenance_scheduling_service(
     asset_repository: AssetRepository = Depends(get_asset_repository),
-    timeline_repository: TimelineRepository = Depends(get_timeline_repository),
-) -> KnowledgeGraphService:
-    return KnowledgeGraphService(asset_service, asset_repository, timeline_repository)
+) -> MaintenanceSchedulingService:
+    return MaintenanceSchedulingService(asset_repository)
 
 
 def get_policy_automation_service(
@@ -313,4 +313,35 @@ def get_intelligence_pipeline_service(
         policy_service,
     )
 
+
+def get_reports_analytics_service(
+    dashboard_service: DashboardService = Depends(get_dashboard_service),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
+    drift_service: DriftMonitoringService = Depends(get_drift_monitoring_service),
+    replacement_service: ReplacementPlanningService = Depends(get_replacement_planning_service),
+    cost_service: CostOptimizationService = Depends(get_cost_optimization_service),
+    maintenance_service: MaintenanceSchedulingService = Depends(get_maintenance_scheduling_service),
+    pipeline_service: IntelligencePipelineService = Depends(get_intelligence_pipeline_service),
+    asset_repository: AssetRepository = Depends(get_asset_repository),
+    maintenance_repository: MaintenanceRepository = Depends(get_maintenance_repository),
+) -> ReportsAnalyticsService:
+    return ReportsAnalyticsService(
+        dashboard_service,
+        recommendation_service,
+        drift_service,
+        replacement_service,
+        cost_service,
+        maintenance_service,
+        pipeline_service,
+        asset_repository,
+        maintenance_repository,
+    )
+
+
+def get_knowledge_graph_service(
+    asset_service: AssetService = Depends(get_asset_service),
+    asset_repository: AssetRepository = Depends(get_asset_repository),
+    timeline_repository: TimelineRepository = Depends(get_timeline_repository),
+) -> KnowledgeGraphService:
+    return KnowledgeGraphService(asset_service, asset_repository, timeline_repository)
 

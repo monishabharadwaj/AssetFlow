@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import date
 
+from app.core.access_scope import AccessContext
+from app.repositories.asset_repository import AssetRepository
 from app.repositories.dashboard_repository import DashboardRepository
 from app.schemas.recommendation import (
     MaintenanceRecommendation,
@@ -21,9 +23,11 @@ class RecommendationService:
         self,
         prediction_service: PredictionService,
         dashboard_repository: DashboardRepository,
+        asset_repository: AssetRepository,
     ) -> None:
         self.prediction_service = prediction_service
         self.dashboard_repository = dashboard_repository
+        self.asset_repository = asset_repository
 
     def _prediction_recommendation(self, prediction) -> MaintenanceRecommendation | None:
         """Derive a single, diverse recommendation from a health prediction."""
@@ -124,17 +128,31 @@ class RecommendationService:
 
         return None
 
-    def list_recommendations(self, *, limit: int = 10) -> RecommendationListResponse:
+    def list_recommendations(
+        self, *, limit: int = 10, scope: AccessContext | None = None
+    ) -> RecommendationListResponse:
+        department_id = scope.scoping_department_id() if scope else None
         items: list[MaintenanceRecommendation] = []
+        predictions = self.prediction_service.list_latest_predictions()
+        allowed_ids: set[uuid.UUID] | None = None
+        if department_id is not None:
+            allowed_ids = self.asset_repository.filter_ids_by_department(
+                [uuid.UUID(p.asset_id) for p in predictions],
+                department_id,
+            )
 
         # 1. Prediction-derived recommendations (diverse categories).
-        for prediction in self.prediction_service.list_latest_predictions():
+        for prediction in predictions:
+            if allowed_ids is not None and uuid.UUID(prediction.asset_id) not in allowed_ids:
+                continue
             rec = self._prediction_recommendation(prediction)
             if rec is not None:
                 items.append(rec)
 
         # 2. Overdue scheduled maintenance (work already on the books).
-        for record, asset in self.dashboard_repository.maintenance_due_items(limit=limit):
+        for record, asset in self.dashboard_repository.maintenance_due_items(
+            limit=limit, department_id=department_id
+        ):
             asset_type = asset.asset_type.name if asset.asset_type else None
             department_name = asset.current_department.name if asset.current_department else None
             items.append(
@@ -165,7 +183,9 @@ class RecommendationService:
             )
 
         # 3. Warranty renewals (lifecycle, non-maintenance category).
-        for asset in self.dashboard_repository.warranty_expiring_soon(within_days=30, limit=5):
+        for asset in self.dashboard_repository.warranty_expiring_soon(
+            within_days=30, limit=5, department_id=department_id
+        ):
             asset_type = asset.asset_type.name if asset.asset_type else None
             department_name = asset.current_department.name if asset.current_department else None
             items.append(

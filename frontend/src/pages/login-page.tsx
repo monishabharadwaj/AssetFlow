@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "../shared/components/ui/card";
 import { Input } from "../shared/components/ui/input";
+import { PasswordInput } from "../shared/components/ui/password-input";
 import { Label } from "../shared/components/ui/label";
 import { useAuth } from "../features/auth/auth-context";
 
@@ -67,9 +68,8 @@ export function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => setPassword(event.target.value)}

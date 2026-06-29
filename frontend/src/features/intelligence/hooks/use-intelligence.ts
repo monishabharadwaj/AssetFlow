@@ -48,6 +48,7 @@ export function useScoreBatch() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
       void queryClient.invalidateQueries({ queryKey: ["intelligence"] });
+      void queryClient.invalidateQueries({ queryKey: ["operations"] });
     },
   });
 }

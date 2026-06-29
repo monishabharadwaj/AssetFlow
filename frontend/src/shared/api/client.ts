@@ -35,9 +35,9 @@ async function parseErrorMessage(response: Response): Promise<string> {
   return text;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const token = getAuthToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -84,8 +84,8 @@ export function buildQueryString(params: Record<string, unknown>): string {
   return qs ? `?${qs}` : "";
 }
 
-export function apiGet<T>(path: string): Promise<T> {
-  return request<T>(path);
+export function apiGet<T>(path: string, timeoutMs?: number): Promise<T> {
+  return request<T>(path, undefined, timeoutMs);
 }
 
 export function apiPost<T>(path: string, body: unknown): Promise<T> {

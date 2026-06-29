@@ -14,12 +14,16 @@ class CostOptimizationService:
         self.asset_repository = asset_repository
         self.maintenance_repository = maintenance_repository
 
-    def analyze(self, *, limit: int = 15) -> CostOptimizationResponse:
+    def analyze(
+        self, *, limit: int = 15, department_id: uuid.UUID | None = None
+    ) -> CostOptimizationResponse:
         items: list[CostOptimizationItem] = []
         page = 1
 
         while len(items) < limit * 2:
-            assets, total = self.asset_repository.list(page=page, page_size=100, is_active=True)
+            assets, total = self.asset_repository.list(
+                page=page, page_size=100, is_active=True, department_id=department_id
+            )
             if not assets:
                 break
             for asset in assets:
