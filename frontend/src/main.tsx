@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import { QueryProvider } from "./app/providers/query-provider";
+import { AuthProvider } from "./features/auth/auth-context";
 import { AppRoutes } from "./app/router/routes";
 import { ErrorBoundary } from "./shared/components/feedback/error-boundary";
 import { ToastProvider } from "./shared/components/feedback/toast-provider";
@@ -14,7 +15,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <QueryProvider>
         <ToastProvider>
           <BrowserRouter>
-            <AppRoutes />
+            <AuthProvider>
+              <AppRoutes />
+            </AuthProvider>
           </BrowserRouter>
         </ToastProvider>
       </QueryProvider>

@@ -23,7 +23,8 @@ class EmployeeRepository(BaseRepository[Employee]):
         return self.db.execute(stmt).scalar_one_or_none()
 
     def get_by_email(self, email: str) -> Employee | None:
-        stmt = select(Employee).where(Employee.email == email)
+        normalized = email.lower()
+        stmt = select(Employee).where(func.lower(Employee.email) == normalized)
         return self.db.execute(stmt).scalar_one_or_none()
 
     def list(

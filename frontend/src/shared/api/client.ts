@@ -1,5 +1,18 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
 const REQUEST_TIMEOUT_MS = 45_000;
+const AUTH_TOKEN_KEY = "assetflow_auth_token";
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
 
 async function parseErrorMessage(response: Response): Promise<string> {
   const text = await response.text();
@@ -25,10 +38,18 @@ async function parseErrorMessage(response: Response): Promise<string> {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { "Content-Type": "application/json", ...init?.headers },
+      headers,
       ...init,
       signal: init?.signal ?? controller.signal,
     });

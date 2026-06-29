@@ -17,6 +17,7 @@ import { formatDayHeader } from "../../../shared/lib/date";
 import type { Allocation, HealthHistory, Maintenance, Transfer } from "../../../shared/api/types";
 import { useDepartmentsList } from "../../departments/hooks/use-departments";
 import { useEmployeesList } from "../../employees/hooks/use-employees";
+import { usePermissions } from "../../auth/use-permissions";
 import { useAsset, useLookups } from "../hooks/use-assets";
 import {
   useAssetAllocations,
@@ -41,6 +42,9 @@ const TABS = ["overview", "timeline", "allocations", "transfers", "maintenance",
 type Tab = (typeof TABS)[number];
 
 export function AssetDetailPageContent() {
+  const { can } = usePermissions();
+  const canWriteAssets = can("assets:write");
+  const canRunIntelligence = can("intelligence:run");
   const { assetId = "" } = useParams<{ assetId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = (searchParams.get("tab") as Tab) || "overview";
@@ -158,7 +162,7 @@ export function AssetDetailPageContent() {
     ? groupTimelineByDay(timeline.data.items)
     : [];
 
-  const actionButtons = (
+  const actionButtons = canWriteAssets ? (
     <>
       <Button type="button" variant="secondary" size="sm" onClick={() => setAssignOpen(true)}>
         {asset.current_status === "ASSIGNED" ? "Reassign" : "Assign"}
@@ -172,17 +176,19 @@ export function AssetDetailPageContent() {
       <Button type="button" variant="secondary" size="sm" onClick={() => setHealthOpen(true)}>
         Health
       </Button>
-      <Button
-        type="button"
-        variant="default"
-        size="sm"
-        disabled={runPrediction.isPending}
-        onClick={() => void runPrediction.mutateAsync()}
-      >
-        {runPrediction.isPending ? "Assessing…" : "Run AI Assessment"}
-      </Button>
+      {canRunIntelligence ? (
+        <Button
+          type="button"
+          variant="default"
+          size="sm"
+          disabled={runPrediction.isPending}
+          onClick={() => void runPrediction.mutateAsync()}
+        >
+          {runPrediction.isPending ? "Assessing…" : "Run AI Assessment"}
+        </Button>
+      ) : null}
     </>
-  );
+  ) : null;
 
   return (
     <div className="grid gap-4 md:gap-6">

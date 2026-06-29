@@ -9,15 +9,25 @@ import { Dialog } from "../../../shared/components/ui/dialog";
 import { Input } from "../../../shared/components/ui/input";
 
 const SUGGESTED_PROMPTS = [
-  "Which assets require maintenance?",
-  "Show high-risk assets",
-  "What transferred recently?",
   "Which department owns the most assets?",
+  "Which assets are at high risk?",
+  "Which assets require maintenance this week?",
+  "Which laptops belong to Engineering?",
+  "Which warranties expire this month?",
 ];
 
 /** Human-readable labels for backend tool names (shown as small badges). */
 const TOOL_LABELS: Record<string, string> = {
   get_dashboard_summary: "Fleet overview",
+  get_department_ranking: "Department ranking",
+  get_department_maintenance_ranking: "Maintenance by dept",
+  get_maintenance_this_week: "Maintenance this week",
+  get_warranty_this_month: "Warranty this month",
+  get_assets_by_department_and_type: "Dept + type filter",
+  get_high_risk_by_type: "High risk by type",
+  get_asset_department: "Asset department",
+  get_asset_assignee: "Asset assignee",
+  get_clarification: "Clarify",
   get_high_risk_assets: "High-risk assets",
   get_healthy_assets: "Healthy assets",
   get_worst_health_assets: "Lowest health",

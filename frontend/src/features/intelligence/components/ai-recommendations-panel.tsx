@@ -5,6 +5,7 @@ import { Sparkles, Wrench } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../shared/components/ui/card";
 import { Button } from "../../../shared/components/ui/button";
 import { useRecommendations, useScoreBatch } from "../hooks/use-intelligence";
+import { usePermissions } from "../../auth/use-permissions";
 import type { MaintenanceRecommendation } from "../api/intelligence-api";
 
 const DISPLAY_LIMIT = 6;
@@ -24,6 +25,8 @@ function priorityBadgeClass(priority: MaintenanceRecommendation["priority"]) {
 }
 
 export function AiRecommendationsPanel() {
+  const { can } = usePermissions();
+  const canRunIntelligence = can("intelligence:run");
   const [showAll, setShowAll] = useState(false);
   const fetchLimit = showAll ? 50 : DISPLAY_LIMIT;
   const { data, isLoading, isError, error } = useRecommendations(fetchLimit);
@@ -47,15 +50,17 @@ export function AiRecommendationsPanel() {
           </CardTitle>
           <CardDescription>Plain-language maintenance priorities from health predictions</CardDescription>
         </div>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={scoreBatch.isPending}
-          onClick={() => void scoreBatch.mutateAsync(false)}
-        >
-          {scoreBatch.isPending ? "Scoring…" : "Run AI scoring"}
-        </Button>
+        {canRunIntelligence ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={scoreBatch.isPending}
+            onClick={() => void scoreBatch.mutateAsync(false)}
+          >
+            {scoreBatch.isPending ? "Scoring…" : "Run AI scoring"}
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent>
         {isError ? (

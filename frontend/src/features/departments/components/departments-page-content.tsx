@@ -15,10 +15,13 @@ import { Textarea } from "../../../shared/components/ui/textarea";
 import { useUrlSearchParams } from "../../../shared/hooks/use-url-search-params";
 import type { Department, DepartmentCreate } from "../../../shared/api/types";
 import { useDepartmentMutations, useDepartmentsList } from "../hooks/use-departments";
+import { usePermissions } from "../../auth/use-permissions";
 
 const DEFAULT_PARAMS = { page: 1, page_size: 20, search: "" };
 
 export function DepartmentsPageContent() {
+  const { can } = usePermissions();
+  const canWrite = can("departments:write");
   const [params, setParams] = useUrlSearchParams(DEFAULT_PARAMS);
   const { toast } = useToast();
   const { data, isLoading } = useDepartmentsList(params);
@@ -77,12 +80,16 @@ export function DepartmentsPageContent() {
       header: "",
       cell: (r) => (
         <div className="flex justify-end gap-1">
-          <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDeactivateId(r.id)}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
+          {canWrite ? (
+            <>
+              <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setDeactivateId(r.id)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </>
+          ) : null}
         </div>
       ),
     },
@@ -94,10 +101,12 @@ export function DepartmentsPageContent() {
         title="Departments"
         description="Manage organizational departments."
         actions={
-          <Button type="button" onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Department
-          </Button>
+          canWrite ? (
+            <Button type="button" onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Department
+            </Button>
+          ) : undefined
         }
       />
 

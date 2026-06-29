@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.allocation import AssetAllocation
     from app.models.asset import Asset
     from app.models.department import Department
+    from app.models.user import User
 
 
 class Employee(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -39,6 +40,11 @@ class Employee(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     allocations: Mapped[list["AssetAllocation"]] = relationship(
         back_populates="employee",
+        lazy="select",
+    )
+    user: Mapped["User | None"] = relationship(
+        back_populates="employee",
+        uselist=False,
         lazy="select",
     )
 

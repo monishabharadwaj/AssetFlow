@@ -12,11 +12,13 @@ from app.repositories.employee_repository import EmployeeRepository
 from app.repositories.health_history_repository import HealthHistoryRepository
 from app.services import narrative as narr
 from app.services.assistant_parsing import (
+    department_ranking_mode,
     extract_asset_tag,
     extract_department_query,
     extract_employee_query,
     extract_status_query,
 )
+from app.services.assistant_intents import extract_search_term, extract_type_and_department
 from app.services.asset_service import AssetService
 from app.services.dashboard_service import DashboardService
 from app.services.prediction_service import PredictionService
@@ -70,12 +72,14 @@ class AssistantTools:
         fallback_answer: str,
         sources: list[dict] | None = None,
         cache_required: bool = False,
-        skip_ollama: bool = True,
+        skip_ollama: bool = False,
+        ollama_validation: str = "relaxed",
     ) -> dict:
         payload: dict = {
             "data_text": data_text,
             "fallback_answer": fallback_answer,
             "sources": sources or [],
+            "ollama_validation": ollama_validation,
         }
         if cache_required:
             payload["cache_required"] = True
@@ -119,6 +123,282 @@ class AssistantTools:
         return self._result(
             data_text=data_text,
             fallback_answer=fallback,
+        )
+
+    def get_department_ranking(self, message: str) -> dict:
+        dept_rows = self.dashboard_repo.assets_by_department()
+        if not dept_rows:
+            return self._result(
+                data_text="No departments with active assets.",
+                fallback_answer=narr.format_assistant_reply(
+                    "I couldn't find any departments with active assets.",
+                    [],
+                ),
+            )
+
+        mode = department_ranking_mode(message)
+        if mode == "fewest":
+            _, name, count = min(dept_rows, key=lambda row: (row[2], row[1]))
+        else:
+            _, name, count = dept_rows[0]
+
+        answer = narr.department_ranking_answer(
+            department_name=name,
+            asset_count=count,
+            ranking=mode,
+        )
+        return self._result(
+            data_text=f"{name}: {count} active assets (ranking={mode})",
+            fallback_answer=answer,
+            ollama_validation="minimal",
+        )
+
+    def get_department_maintenance_ranking(self) -> dict:
+        rows = self.dashboard_repo.open_maintenance_by_department()
+        if not rows:
+            return self._result(
+                data_text="No open maintenance records by department.",
+                fallback_answer=narr.format_assistant_reply(
+                    "No departments have open maintenance records right now.",
+                    [],
+                ),
+            )
+        _, name, count = rows[0]
+        answer = narr.department_maintenance_ranking_answer(
+            department_name=name,
+            maintenance_count=count,
+        )
+        return self._result(
+            data_text=f"{name}: {count} open maintenance records",
+            fallback_answer=answer,
+            ollama_validation="minimal",
+        )
+
+    def get_maintenance_this_week(self) -> dict:
+        rows = self.dashboard_repo.maintenance_scheduled_this_week(limit=8)
+        if not rows:
+            return self._result(
+                data_text="No maintenance scheduled this week.",
+                fallback_answer=narr.format_assistant_reply(
+                    "No assets have maintenance scheduled for the next 7 days.",
+                    [],
+                ),
+            )
+        bullets = [
+            narr.overdue_maintenance_bullet(
+                asset_tag=asset.asset_tag,
+                maintenance_type=record.maintenance_type.value,
+                scheduled_date=record.scheduled_date,
+            )
+            for record, asset in rows
+        ]
+        return self._result(
+            data_text="; ".join(bullets),
+            fallback_answer=narr.format_assistant_reply(
+                f"{len(bullets)} asset{'s' if len(bullets) != 1 else ''} with maintenance due this week:",
+                bullets,
+            ),
+            sources=self._asset_sources([asset for _, asset in rows]),
+        )
+
+    def get_warranty_this_month(self) -> dict:
+        assets = self.dashboard_repo.warranty_expiring_this_month(limit=8)
+        if not assets:
+            return self._result(
+                data_text="No warranties expiring this month.",
+                fallback_answer=narr.format_assistant_reply(
+                    "No warranties are expiring this calendar month.",
+                    [],
+                ),
+            )
+        bullets = [
+            narr.warranty_expiring_bullet(
+                asset_name=a.name,
+                asset_tag=a.asset_tag,
+                expiry=a.warranty_expiry,  # type: ignore[arg-type]
+            )
+            for a in assets
+            if a.warranty_expiry
+        ]
+        return self._result(
+            data_text="; ".join(bullets),
+            fallback_answer=narr.format_assistant_reply(
+                "Warranties expiring this month:",
+                bullets,
+            ),
+            sources=self._asset_sources(assets),
+        )
+
+    def get_assets_by_department_and_type(self, message: str) -> dict:
+        type_name, dept_query = extract_type_and_department(message)
+        if not type_name or not dept_query:
+            return self._result(
+                data_text="No department and asset type detected.",
+                fallback_answer=narr.format_assistant_reply(
+                    "Tell me both a department and asset type.",
+                    ["Example: Which laptops belong to Engineering?"],
+                ),
+            )
+        department = self.department_repo.find_best_match(dept_query)
+        if not department:
+            return self._result(
+                data_text=f"No department matched '{dept_query}'.",
+                fallback_answer=narr.format_assistant_reply(
+                    f"I couldn't find a department matching '{dept_query}'.",
+                    [],
+                ),
+            )
+        assets, total = self.asset_repo.search_by_type_and_department(
+            type_name=type_name,
+            department_id=department.id,
+            page=1,
+            page_size=8,
+        )
+        intro = narr.dept_type_assets_intro(
+            department_name=department.name,
+            type_name=type_name,
+            total=total,
+        )
+        if not assets:
+            return self._result(data_text=intro, fallback_answer=intro)
+        bullets = [
+            narr.asset_list_bullet(
+                asset_name=a.name,
+                asset_tag=a.asset_tag,
+                status=a.current_status.value,
+            )
+            for a in assets
+        ]
+        return self._result(
+            data_text=f"{intro} " + "; ".join(bullets),
+            fallback_answer=narr.format_assistant_reply(intro, bullets),
+            sources=self._asset_sources(assets),
+        )
+
+    def get_high_risk_by_type(self, message: str) -> dict:
+        if not self.predictions.is_cache_warm():
+            return self._scoring_required()
+
+        from app.services.assistant_intents import extract_asset_type_query
+
+        type_name = extract_asset_type_query(message)
+        if not type_name:
+            return self.get_high_risk_assets()
+
+        high_risk = self.predictions.get_high_risk(limit=20)
+        filtered = [
+            item
+            for item in high_risk.items
+            if item.asset_type_name and type_name.lower() in item.asset_type_name.lower()
+        ]
+        if not filtered:
+            return self._result(
+                data_text=f"No high-risk {type_name.lower()}s found.",
+                fallback_answer=narr.format_assistant_reply(
+                    f"No {type_name.lower()}s are currently flagged as high risk.",
+                    [],
+                ),
+            )
+        bullets = [
+            narr.high_risk_bullet(
+                asset_tag=item.asset_tag,
+                asset_type=item.asset_type_name,
+                department_name=item.department_name,
+                health_pct=int(item.health_score * 100),
+            )
+            for item in filtered[:5]
+        ]
+        sources = [
+            {"label": item.asset_tag, "asset_id": item.asset_id, "url": f"/assets/{item.asset_id}"}
+            for item in filtered[:5]
+        ]
+        return self._result(
+            data_text="; ".join(bullets),
+            fallback_answer=narr.format_assistant_reply(
+                f"High-risk {type_name.lower()}s:",
+                bullets,
+            ),
+            sources=sources,
+            ollama_validation="strict",
+        )
+
+    def get_asset_department(self, asset_tag: str) -> dict:
+        asset = self.asset_repo.get_by_tag(asset_tag.upper())
+        if not asset:
+            assets, _ = self.asset_repo.search(page=1, page_size=1, asset_tag=asset_tag)
+            asset = assets[0] if assets else None
+        if not asset:
+            return self._result(
+                data_text=f"No asset matched '{asset_tag}'.",
+                fallback_answer=narr.format_assistant_reply(
+                    f"I couldn't find asset {asset_tag}.",
+                    [],
+                ),
+            )
+
+        department = self.department_repo.get_by_id(asset.current_department_id)
+        dept_name = department.name if department else "Unknown"
+        answer = narr.asset_department_answer(
+            asset_tag=asset.asset_tag,
+            asset_name=asset.name,
+            department_name=dept_name,
+        )
+        return self._result(
+            data_text=f"{asset.asset_tag} -> {dept_name}",
+            fallback_answer=answer,
+            ollama_validation="minimal",
+            sources=[
+                {
+                    "label": asset.asset_tag,
+                    "asset_id": str(asset.id),
+                    "url": f"/assets/{asset.id}",
+                }
+            ],
+        )
+
+    def get_asset_assignee(self, asset_tag: str) -> dict:
+        asset = self.asset_repo.get_by_tag(asset_tag.upper())
+        if not asset:
+            assets, _ = self.asset_repo.search(page=1, page_size=1, asset_tag=asset_tag)
+            asset = assets[0] if assets else None
+        if not asset:
+            return self._result(
+                data_text=f"No asset matched '{asset_tag}'.",
+                fallback_answer=narr.format_assistant_reply(
+                    f"I couldn't find asset {asset_tag}.",
+                    [],
+                ),
+            )
+
+        employee_name: str | None = None
+        if asset.current_assigned_employee_id:
+            employee = self.employee_repo.get_by_id(asset.current_assigned_employee_id)
+            if employee:
+                employee_name = narr.employee_display(employee.first_name, employee.last_name)
+
+        answer = narr.asset_assignee_answer(
+            asset_tag=asset.asset_tag,
+            asset_name=asset.name,
+            employee_name=employee_name,
+        )
+        return self._result(
+            data_text=f"{asset.asset_tag} assignee={employee_name or 'unassigned'}",
+            fallback_answer=answer,
+            ollama_validation="minimal",
+            sources=[
+                {
+                    "label": asset.asset_tag,
+                    "asset_id": str(asset.id),
+                    "url": f"/assets/{asset.id}?tab=allocations",
+                }
+            ],
+        )
+
+    def get_clarification(self) -> dict:
+        return self._result(
+            data_text="Clarification requested.",
+            fallback_answer=narr.assistant_clarify_message(),
+            sources=[],
             skip_ollama=True,
         )
 
@@ -155,7 +435,6 @@ class AssistantTools:
             data_text="; ".join(bullets),
             fallback_answer=narr.format_assistant_reply(intro, bullets),
             sources=[],
-            skip_ollama=True,
         )
 
     def get_high_risk_assets(self) -> dict:
@@ -171,7 +450,6 @@ class AssistantTools:
                     [],
                 ),
                 sources=[],
-                skip_ollama=True,
             )
 
         bullets = [
@@ -194,7 +472,7 @@ class AssistantTools:
                 bullets,
             ),
             sources=sources,
-            skip_ollama=True,
+            ollama_validation="strict",
         )
 
     def get_worst_health_assets(self) -> dict:
@@ -225,7 +503,7 @@ class AssistantTools:
                 bullets,
             ),
             sources=sources,
-            skip_ollama=True,
+            ollama_validation="strict",
         )
 
     def get_maintenance_recommendations(self) -> dict:
@@ -241,7 +519,6 @@ class AssistantTools:
                         ],
                     ),
                     sources=[],
-                    skip_ollama=True,
                 )
             return self._result(
                 data_text="No maintenance recommendations at this time.",
@@ -250,7 +527,6 @@ class AssistantTools:
                     [],
                 ),
                 sources=[],
-                skip_ollama=True,
             )
 
         bullets = [
@@ -271,7 +547,6 @@ class AssistantTools:
                 bullets,
             ),
             sources=sources,
-            skip_ollama=True,
         )
 
     def get_recent_transfers(self) -> dict:
@@ -284,7 +559,6 @@ class AssistantTools:
                     [],
                 ),
                 sources=[],
-                skip_ollama=True,
             )
 
         bullets = []
@@ -305,7 +579,6 @@ class AssistantTools:
             data_text="; ".join(bullets),
             fallback_answer=narr.format_assistant_reply("Recent transfers:", bullets),
             sources=sources,
-            skip_ollama=True,
         )
 
     def get_warranty_expiring(self) -> dict:
@@ -318,7 +591,6 @@ class AssistantTools:
                     [],
                 ),
                 sources=[],
-                skip_ollama=True,
             )
 
         bullets = [
@@ -341,28 +613,11 @@ class AssistantTools:
                 bullets,
             ),
             sources=sources,
-            skip_ollama=True,
         )
 
     def search_assets(self, message: str) -> dict:
+        query = extract_search_term(message)
         tokens = re.findall(r"[A-Za-z0-9-]+", message)
-        stop_words = {
-            "show",
-            "which",
-            "assets",
-            "asset",
-            "find",
-            "search",
-            "where",
-            "many",
-            "how",
-            "the",
-            "are",
-            "there",
-            "what",
-            "list",
-        }
-        query = next((t for t in tokens if len(t) >= 3 and t.lower() not in stop_words), "")
         location_query = None
         for token in tokens:
             if token.lower() in ("floor", "building", "room", "hq", "lab", "warehouse"):
@@ -385,7 +640,6 @@ class AssistantTools:
                 data_text="No search query detected.",
                 fallback_answer=narr.assistant_capabilities_message(),
                 sources=[],
-                skip_ollama=True,
             )
 
         if not result.items:
@@ -396,7 +650,6 @@ class AssistantTools:
                     ["Try an asset name, tag (e.g. IT-LAP-0001), or location keyword."],
                 ),
                 sources=[],
-                skip_ollama=True,
             )
 
         bullets = [
@@ -415,7 +668,6 @@ class AssistantTools:
             data_text="; ".join(bullets),
             fallback_answer=narr.format_assistant_reply("Matching assets:", bullets),
             sources=sources,
-            skip_ollama=True,
         )
 
     def get_help(self) -> dict:
@@ -448,7 +700,6 @@ class AssistantTools:
                     [],
                 ),
                 sources=[],
-                skip_ollama=True,
             )
 
         bullets = [
@@ -466,7 +717,7 @@ class AssistantTools:
                 bullets,
             ),
             sources=sources,
-            skip_ollama=True,
+            ollama_validation="strict",
         )
 
     def get_overdue_maintenance(self) -> dict:
@@ -801,6 +1052,7 @@ class AssistantTools:
                 f"Health for {asset.asset_tag} ({asset.name}):",
                 bullets,
             ),
+            ollama_validation="relaxed",
             sources=[
                 {
                     "label": asset.asset_tag,

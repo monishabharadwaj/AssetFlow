@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Bot, ScanLine, Search } from "lucide-react";
+import { Bot, LogOut, ScanLine, Search } from "lucide-react";
 
 import { AssistantPanel } from "../../features/assistant/components/assistant-panel";
+import { useAuth } from "../../features/auth/auth-context";
 import { QrScannerDialog } from "../../features/assets/components/qr-scanner-dialog";
 import { SearchCommand } from "../../shared/components/search-command";
 import { Badge } from "../../shared/components/ui/badge";
@@ -9,6 +10,7 @@ import { Button } from "../../shared/components/ui/button";
 import { Breadcrumbs } from "./breadcrumbs";
 
 export function Header() {
+  const { user, logout } = useAuth();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -50,7 +52,19 @@ export function Header() {
               <ScanLine className="mr-2 h-4 w-4" />
               Scan
             </Button>
-            <Badge variant="secondary">Demo User</Badge>
+            <Badge variant="secondary" title={user?.email ?? undefined}>
+              {user?.full_name ?? "User"} · {user?.role ?? "—"}
+              {user?.department_name ? ` · ${user.department_name}` : ""}
+            </Badge>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={logout}
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </header>

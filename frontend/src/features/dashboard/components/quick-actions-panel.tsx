@@ -1,11 +1,19 @@
 import { Box, UserPlus, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { usePermissions } from "../../auth/use-permissions";
 import { buttonVariants } from "../../../shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../shared/components/ui/card";
 import { cn } from "../../../shared/lib/utils";
 
 export function QuickActionsPanel() {
+  const { can } = usePermissions();
+  const canWriteAssets = can("assets:write");
+
+  if (!canWriteAssets) {
+    return null;
+  }
+
   const linkClass = cn(buttonVariants({ variant: "secondary" }), "w-full justify-start");
 
   return (

@@ -7,6 +7,7 @@ from app.models.health_history import AssetHealthHistory
 from app.models.maintenance import MaintenanceRecord
 from app.models.notification import Notification
 from app.models.transfer import AssetTransfer
+from app.models.user import User
 
 __all__ = [
     "Base",
@@ -20,4 +21,5 @@ __all__ = [
     "MaintenanceRecord",
     "AssetHealthHistory",
     "Notification",
+    "User",
 ]

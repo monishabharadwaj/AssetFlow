@@ -16,6 +16,7 @@ import { Input } from "../../../shared/components/ui/input";
 import { Select } from "../../../shared/components/ui/select";
 import { useUrlSearchParams } from "../../../shared/hooks/use-url-search-params";
 import type { Asset, AssetStatus } from "../../../shared/api/types";
+import { usePermissions } from "../../auth/use-permissions";
 import { useDepartmentsList } from "../../departments/hooks/use-departments";
 import { useAssetMutations, useAssetsList, useAssetsSearch } from "../hooks/use-assets";
 import { AssetFormDialog } from "./asset-form-dialog";
@@ -39,6 +40,8 @@ const DEFAULT_PARAMS = {
 };
 
 export function AssetsPageContent() {
+  const { can } = usePermissions();
+  const canWrite = can("assets:write");
   const [searchParams] = useSearchParams();
   const createFromUrl = searchParams.get("create") === "true";
 
@@ -108,12 +111,16 @@ export function AssetsPageContent() {
           <Link to={`/assets/${row.id}`} className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
             <Eye className="h-4 w-4" />
           </Link>
-          <Button variant="ghost" size="icon" onClick={() => { setEditAsset(row); setFormOpen(true); }}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDeactivateId(row.id)}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
+          {canWrite ? (
+            <>
+              <Button variant="ghost" size="icon" onClick={() => { setEditAsset(row); setFormOpen(true); }}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setDeactivateId(row.id)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </>
+          ) : null}
         </div>
       ),
     },
@@ -136,16 +143,18 @@ export function AssetsPageContent() {
         title="Assets"
         description="Search, register, and manage organizational assets."
         actions={
-          <Button
-            type="button"
-            onClick={() => {
-              setEditAsset(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Register Asset
-          </Button>
+          canWrite ? (
+            <Button
+              type="button"
+              onClick={() => {
+                setEditAsset(null);
+                setFormOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Register Asset
+            </Button>
+          ) : undefined
         }
       />
 

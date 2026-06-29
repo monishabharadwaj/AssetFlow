@@ -38,6 +38,12 @@ class NotificationSeverity(str, enum.Enum):
     SUCCESS = "SUCCESS"
 
 
+class UserRole(str, enum.Enum):
+    ADMIN = "ADMIN"
+    MANAGER = "MANAGER"
+    VIEWER = "VIEWER"
+
+
 class NotificationType(str, enum.Enum):
     HEALTH_DRIFT = "HEALTH_DRIFT"
     POLICY_AUTO_MAINTENANCE = "POLICY_AUTO_MAINTENANCE"

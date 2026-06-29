@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { PageHeader } from "../../../shared/components/data-display/page-header";
 import { EntityDataTable, type ColumnDef } from "../../../shared/components/data-display/entity-data-table";
@@ -16,12 +17,19 @@ import { Select } from "../../../shared/components/ui/select";
 import { formatDate } from "../../../shared/lib/format";
 import { useUrlSearchParams } from "../../../shared/hooks/use-url-search-params";
 import type { Allocation, Employee, EmployeeCreate } from "../../../shared/api/types";
+import { createUserAccount, listUserAccounts } from "../../auth/api";
+import type { UserRole } from "../../auth/types";
+import { usePermissions } from "../../auth/use-permissions";
 import { useDepartmentsList } from "../../departments/hooks/use-departments";
 import { useEmployeeAllocations, useEmployeeMutations, useEmployeesList } from "../hooks/use-employees";
 
 const DEFAULT_PARAMS = { page: 1, page_size: 20, search: "", department_id: "" };
+const ROLES: UserRole[] = ["ADMIN", "MANAGER", "VIEWER"];
 
 export function EmployeesPageContent() {
+  const { can } = usePermissions();
+  const canWrite = can("employees:write");
+  const canManageUsers = can("users:manage");
   const [params, setParams] = useUrlSearchParams(DEFAULT_PARAMS);
   const { toast } = useToast();
   const { data, isLoading } = useEmployeesList({
@@ -32,8 +40,15 @@ export function EmployeesPageContent() {
   });
   const { data: deptData } = useDepartmentsList({ page: 1, page_size: 100 });
   const { create, update, deactivate } = useEmployeeMutations();
+  const accountsQuery = useQuery({
+    queryKey: ["auth", "users"],
+    queryFn: listUserAccounts,
+    enabled: canManageUsers,
+  });
 
   const [formOpen, setFormOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountEmployee, setAccountEmployee] = useState<Employee | null>(null);
   const [editEmp, setEditEmp] = useState<Employee | null>(null);
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
@@ -45,8 +60,14 @@ export function EmployeesPageContent() {
     email: "",
     job_title: "",
   });
+  const [accountPassword, setAccountPassword] = useState("Welcome123");
+  const [accountRole, setAccountRole] = useState<UserRole>("VIEWER");
+  const [createAccountOnSave, setCreateAccountOnSave] = useState(true);
 
   const { data: allocData, isLoading: allocLoading } = useEmployeeAllocations(historyId ?? "", 1, 20);
+  const accountByEmployeeId = new Map(
+    (accountsQuery.data ?? []).map((account) => [account.employee_id, account]),
+  );
 
   const openCreate = () => {
     setEditEmp(null);
@@ -58,6 +79,9 @@ export function EmployeesPageContent() {
       email: "",
       job_title: "",
     });
+    setCreateAccountOnSave(canManageUsers);
+    setAccountPassword("Welcome123");
+    setAccountRole("VIEWER");
     setFormOpen(true);
   };
 
@@ -74,11 +98,31 @@ export function EmployeesPageContent() {
     setFormOpen(true);
   };
 
+  const openGrantAccess = (emp: Employee) => {
+    setAccountEmployee(emp);
+    setAccountPassword("Welcome123");
+    setAccountRole("VIEWER");
+    setAccountOpen(true);
+  };
+
   const handleSubmit = async () => {
     try {
       if (editEmp) {
         await update.mutateAsync({ id: editEmp.id, data: form });
         toast("Employee updated");
+      } else if (canManageUsers && createAccountOnSave && accountPassword) {
+        await createUserAccount({
+          first_name: form.first_name,
+          last_name: form.last_name,
+          email: form.email,
+          employee_code: form.employee_code,
+          department_id: form.department_id,
+          job_title: form.job_title || undefined,
+          password: accountPassword,
+          role: accountRole,
+        });
+        toast("Employee and login account created");
+        void accountsQuery.refetch();
       } else {
         await create.mutateAsync(form);
         toast("Employee created");
@@ -86,6 +130,22 @@ export function EmployeesPageContent() {
       setFormOpen(false);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to save", "error");
+    }
+  };
+
+  const handleGrantAccess = async () => {
+    if (!accountEmployee) return;
+    try {
+      await createUserAccount({
+        employee_id: accountEmployee.id,
+        password: accountPassword,
+        role: accountRole,
+      });
+      toast("Login account created");
+      setAccountOpen(false);
+      void accountsQuery.refetch();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to create account", "error");
     }
   };
 
@@ -109,6 +169,14 @@ export function EmployeesPageContent() {
     { id: "dept", header: "Department", cell: (r) => deptMap.get(r.department_id) ?? "—" },
     { id: "title", header: "Job Title", cell: (r) => r.job_title ?? "—" },
     {
+      id: "access",
+      header: "Access",
+      cell: (r) => {
+        const account = accountByEmployeeId.get(r.id);
+        return account ? `${account.role}` : "No login";
+      },
+    },
+    {
       id: "actions",
       header: "",
       cell: (r) => (
@@ -116,12 +184,21 @@ export function EmployeesPageContent() {
           <Button variant="ghost" size="sm" onClick={() => setHistoryId(r.id)}>
             History
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDeactivateId(r.id)}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
+          {canManageUsers && !accountByEmployeeId.has(r.id) ? (
+            <Button variant="ghost" size="icon" onClick={() => openGrantAccess(r)} aria-label="Grant login access">
+              <KeyRound className="h-4 w-4" />
+            </Button>
+          ) : null}
+          {canWrite ? (
+            <>
+              <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setDeactivateId(r.id)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </>
+          ) : null}
         </div>
       ),
     },
@@ -138,12 +215,14 @@ export function EmployeesPageContent() {
     <div className="grid gap-4 md:gap-6">
       <PageHeader
         title="Employees"
-        description="Manage employees and view allocation history."
+        description="Manage employees and organization login accounts."
         actions={
-          <Button type="button" onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Employee
-          </Button>
+          canWrite ? (
+            <Button type="button" onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Employee
+            </Button>
+          ) : undefined
         }
       />
 
@@ -239,6 +318,76 @@ export function EmployeesPageContent() {
               value={form.job_title ?? ""}
               onChange={(e) => setForm({ ...form, job_title: e.target.value })}
             />
+          </div>
+          {!editEmp && canManageUsers ? (
+            <>
+              <div className="space-y-2 sm:col-span-2">
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={createAccountOnSave}
+                    onChange={(e) => setCreateAccountOnSave(e.target.checked)}
+                  />
+                  Create login account for this employee
+                </Label>
+              </div>
+              {createAccountOnSave ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>Initial Password</Label>
+                    <Input
+                      type="password"
+                      value={accountPassword}
+                      onChange={(e) => setAccountPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Role</Label>
+                    <Select
+                      value={accountRole}
+                      onChange={(e) => setAccountRole(e.target.value as UserRole)}
+                    >
+                      {ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      </FormDialog>
+
+      <FormDialog
+        open={accountOpen}
+        onOpenChange={setAccountOpen}
+        title="Grant login access"
+        onSubmit={handleGrantAccess}
+      >
+        <div className="grid gap-4">
+          <p className="text-sm text-muted-foreground">
+            Create a login for {accountEmployee?.first_name} {accountEmployee?.last_name} ({accountEmployee?.email}).
+          </p>
+          <div className="space-y-2">
+            <Label>Password</Label>
+            <Input
+              type="password"
+              value={accountPassword}
+              onChange={(e) => setAccountPassword(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Role</Label>
+            <Select value={accountRole} onChange={(e) => setAccountRole(e.target.value as UserRole)}>
+              {ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
       </FormDialog>

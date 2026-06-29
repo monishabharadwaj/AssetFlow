@@ -222,10 +222,10 @@ def seed_employees(
             last = rng.choice(LAST_NAMES)
             emp_code = f"{code}-{idx:04d}"
             email_base = f"{first.lower()}.{last.lower()}{idx}"
-            email = f"{email_base}@assetflow.demo"
+            email = f"{email_base}@assetflow.app"
             while email in used_emails:
                 idx += 1
-                email = f"{first.lower()}.{last.lower()}{idx}@assetflow.demo"
+                email = f"{first.lower()}.{last.lower()}{idx}@assetflow.app"
             used_emails.add(email)
             employees.append(
                 Employee(
@@ -247,7 +247,7 @@ def seed_employees(
         first = rng.choice(FIRST_NAMES)
         last = rng.choice(LAST_NAMES)
         emp_code = f"{dept.code}-{idx:04d}"
-        email = f"{first.lower()}.{last.lower()}{idx}@assetflow.demo"
+        email = f"{first.lower()}.{last.lower()}{idx}@assetflow.app"
         employees.append(
             Employee(
                 department_id=dept.id,
@@ -682,6 +682,7 @@ def _type_name_from_asset(db: Session, asset: Asset, type_by_name: dict[str, Ass
 
 def run_seed(db: Session, profile: SeedProfile, *, reset: bool = False) -> dict[str, int]:
     from app.seeding.reset import reset_operational_data
+    from app.seeding.users import ensure_employee_accounts
 
     if reset:
         reset_operational_data(db)
@@ -696,5 +697,7 @@ def run_seed(db: Session, profile: SeedProfile, *, reset: bool = False) -> dict[
     counts = seed_history(
         db, profile, departments, employees, assets, type_by_name, rng, hist_start
     )
+    account_info = ensure_employee_accounts(db)
+    counts.update(account_info)
     counts["profile"] = profile.name
     return counts

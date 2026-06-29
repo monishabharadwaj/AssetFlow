@@ -105,6 +105,39 @@ class AssetRepository(BaseRepository[Asset]):
         items = list(self.db.execute(stmt).scalars().all())
         return items, total
 
+    def search_by_type_and_department(
+        self,
+        *,
+        type_name: str,
+        department_id: uuid.UUID,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[Asset], int]:
+        stmt = (
+            select(Asset)
+            .join(AssetType, Asset.asset_type_id == AssetType.id)
+            .where(
+                Asset.is_active.is_(True),
+                Asset.current_department_id == department_id,
+                AssetType.name.ilike(type_name),
+            )
+        )
+        count_stmt = (
+            select(func.count())
+            .select_from(Asset)
+            .join(AssetType, Asset.asset_type_id == AssetType.id)
+            .where(
+                Asset.is_active.is_(True),
+                Asset.current_department_id == department_id,
+                AssetType.name.ilike(type_name),
+            )
+        )
+        total = self.db.execute(count_stmt).scalar_one()
+        offset = (page - 1) * page_size
+        stmt = stmt.order_by(Asset.name).offset(offset).limit(page_size)
+        items = list(self.db.execute(stmt).scalars().all())
+        return items, total
+
     def update(self, asset: Asset, data: dict) -> Asset:
         return self.apply_partial_update(asset, data)
 

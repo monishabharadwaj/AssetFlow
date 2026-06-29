@@ -304,10 +304,13 @@ def assistant_capabilities_message() -> str:
         [
             "High-risk and healthy assets (AI health scores)",
             "Health details for a specific asset tag (e.g. IT-LAP-0001)",
-            "Overdue maintenance and assets currently in maintenance",
+            "Department rankings (most assets, most maintenance)",
+            "Laptops/servers in a department (e.g. Engineering laptops)",
+            "Overdue maintenance and maintenance due this week",
             "AI maintenance recommendations and warranty renewals",
             "Recent transfers, assignments, and completed maintenance",
-            "Assets in a department or assigned to an employee",
+            "Available, assigned, and in-maintenance assets",
+            "Assets assigned to an employee",
             "Fleet counts (assets, employees, laptops, and more)",
             "Finding assets by name, tag, status, or location",
         ],
@@ -348,6 +351,76 @@ def transfer_bullet(*, headline: str, asset_tag: str) -> str:
 def asset_list_bullet(*, asset_name: str, asset_tag: str, status: str) -> str:
     readable_status = status.replace("_", " ").lower()
     return f"{asset_name} — {readable_status} ({asset_tag})"
+
+
+def department_ranking_answer(
+    *,
+    department_name: str,
+    asset_count: int,
+    ranking: str = "most",
+) -> str:
+    if ranking == "fewest":
+        return (
+            f"{department_name} currently has the fewest active assets, "
+            f"with {asset_count} asset{'s' if asset_count != 1 else ''}."
+        )
+    return (
+        f"{department_name} currently owns the most assets, "
+        f"with {asset_count} active asset{'s' if asset_count != 1 else ''}."
+    )
+
+
+def asset_department_answer(
+    *,
+    asset_tag: str,
+    asset_name: str,
+    department_name: str,
+) -> str:
+    return f"{department_name} owns {asset_name} ({asset_tag})."
+
+
+def asset_assignee_answer(
+    *,
+    asset_tag: str,
+    asset_name: str,
+    employee_name: str | None,
+) -> str:
+    if employee_name:
+        return f"{employee_name} is currently assigned to {asset_name} ({asset_tag})."
+    return f"{asset_name} ({asset_tag}) is not currently assigned to anyone."
+
+
+def assistant_clarify_message() -> str:
+    return format_assistant_reply(
+        "I'm not sure what you need. Try asking about a specific topic:",
+        [
+            "Which department owns the most assets?",
+            "Which laptops belong to Engineering?",
+            "Which assets are high risk?",
+            "Which assets require maintenance this week?",
+            "Which warranties expire this month?",
+            "Which department has the most maintenance requests?",
+        ],
+    )
+
+
+def department_maintenance_ranking_answer(
+    *,
+    department_name: str,
+    maintenance_count: int,
+) -> str:
+    return (
+        f"{department_name} has the most open maintenance activity right now, "
+        f"with {maintenance_count} scheduled or in-progress record"
+        f"{'s' if maintenance_count != 1 else ''}."
+    )
+
+
+def dept_type_assets_intro(*, department_name: str, type_name: str, total: int) -> str:
+    return (
+        f"{department_name} has {total} active {type_name.lower()}"
+        f"{'s' if total != 1 else ''}."
+    )
 
 
 def dashboard_overview_narrative(

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.2:3b"
     ollama_timeout_seconds: float = 30.0
     assistant_enabled: bool = True
-    assistant_use_ollama: bool = False
+    assistant_use_ollama: bool = True
 
     drift_min_drop: float = 0.10
     drift_severe_drop: float = 0.15
@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = False
     scheduler_interval_minutes: int = 60
     scheduler_run_on_startup: bool = False
+
+    auth_enabled: bool = True
+    jwt_secret_key: str = "change-me-in-production-use-a-long-random-string"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 480
 
 
 

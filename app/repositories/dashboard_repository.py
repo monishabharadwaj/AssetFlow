@@ -256,6 +256,71 @@ class DashboardRepository(BaseRepository[Asset]):
         )
         return list(self.db.execute(stmt).scalars().all())
 
+    def maintenance_scheduled_this_week(
+        self, limit: int = 8
+    ) -> list[tuple[MaintenanceRecord, Asset]]:
+        from datetime import timedelta
+
+        today = date.today()
+        week_end = today + timedelta(days=7)
+        stmt = (
+            select(MaintenanceRecord)
+            .options(
+                joinedload(MaintenanceRecord.asset)
+                .load_only(Asset.id, Asset.asset_tag, Asset.name)
+                .options(*_asset_feed_options()),
+            )
+            .where(
+                MaintenanceRecord.status.in_(
+                    [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
+                ),
+                MaintenanceRecord.scheduled_date.is_not(None),
+                MaintenanceRecord.scheduled_date >= today,
+                MaintenanceRecord.scheduled_date <= week_end,
+            )
+            .order_by(MaintenanceRecord.scheduled_date.asc())
+            .limit(limit)
+        )
+        records = self.db.execute(stmt).scalars().all()
+        return [(r, r.asset) for r in records]
+
+    def open_maintenance_by_department(self) -> list[tuple[str, str, int]]:
+        stmt = (
+            select(Department.id, Department.name, func.count(MaintenanceRecord.id))
+            .select_from(MaintenanceRecord)
+            .join(Asset, Asset.id == MaintenanceRecord.asset_id)
+            .join(Department, Department.id == Asset.current_department_id)
+            .where(
+                MaintenanceRecord.status.in_(
+                    [MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS]
+                )
+            )
+            .group_by(Department.id, Department.name)
+            .order_by(func.count(MaintenanceRecord.id).desc(), Department.name)
+        )
+        return [(str(dep_id), name, count) for dep_id, name, count in self.db.execute(stmt).all()]
+
+    def warranty_expiring_this_month(self, limit: int = 8) -> list[Asset]:
+        import calendar
+        from datetime import timedelta
+
+        today = date.today()
+        month_start = today.replace(day=1)
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        month_end = today.replace(day=last_day)
+        stmt = (
+            select(Asset)
+            .where(
+                Asset.is_active.is_(True),
+                Asset.warranty_expiry.is_not(None),
+                Asset.warranty_expiry >= month_start,
+                Asset.warranty_expiry <= month_end,
+            )
+            .order_by(Asset.warranty_expiry.asc())
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
     def available_assignable_laptops(self, limit: int = 5) -> list[Asset]:
         from app.models.asset import AssetType
 
