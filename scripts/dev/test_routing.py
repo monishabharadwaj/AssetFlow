@@ -1,11 +1,11 @@
 """
 Assistant routing regression suite — run with:
-  $env:PYTHONPATH='.'; py scratch/test_routing.py
+  $env:PYTHONPATH='.'; py scripts/dev/test_routing.py
 """
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from app.schemas.assistant import ChatMessage
 from app.services.assistant_service import AssistantService, _validate_ollama_output

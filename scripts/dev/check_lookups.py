@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-sys.path.append(str(Path("c:/Users/Hp/OneDrive/Desktop/AssetFlow-AI")))
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from app.core.database import SessionLocal
 from sqlalchemy import func, select

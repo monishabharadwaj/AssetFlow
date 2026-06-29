@@ -69,6 +69,14 @@ Use these fixed tags from the demo seed profile:
   - *How many laptops do we have?*
 - Open `ADM-PRT-001` → **Run AI Assessment** on asset detail
 
+### 7. Reports & Analytics (1 min)
+
+- Go to **Reports**
+- Note scope label: organization-wide (Admin) or department-scoped (Manager/Viewer)
+- Review KPI cards, executive AI report sections, drift/cost/replacement charts
+- Toggle **AI Enhanced** (Admin/Manager) or observe passive AI narratives (Viewer)
+- For department users, check org benchmark KPIs (company avg vs your department)
+
 **API test (Swagger):** `POST /api/v1/assistant/chat` with `{"message": "Which assets require maintenance?"}`
 
 ## Talking Points
@@ -79,3 +87,4 @@ Use these fixed tags from the demo seed profile:
 - Asset-centric lifecycle with unified timeline and attention queue
 - FT-Transformer health prediction (MAE ~0.035 on synthetic training set)
 - Tool-based assistant with Ollama optional layer (`llama3.2:3b`) and narrative fallback
+- Executive Reports & Analytics with department scoping and org benchmark KPIs

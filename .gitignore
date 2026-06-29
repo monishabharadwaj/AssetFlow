@@ -7,8 +7,10 @@ __pycache__/
 
 # Tooling caches
 .pytest_cache/
+pytest-cache-files-*/
 .mypy_cache/
 .ruff_cache/
+*.tsbuildinfo
 
 # IDE/editor files
 .vscode/

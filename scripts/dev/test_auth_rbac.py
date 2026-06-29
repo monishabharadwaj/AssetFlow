@@ -1,6 +1,6 @@
 """
 Auth & RBAC regression suite — run with:
-  $env:PYTHONPATH='.'; py scratch/test_auth_rbac.py
+  $env:PYTHONPATH='.'; py scripts/dev/test_auth_rbac.py
 
 Unit tests run without a server. Integration tests use TestClient against the
 configured database (seeded enterprise profile recommended).
@@ -12,7 +12,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, func, select
