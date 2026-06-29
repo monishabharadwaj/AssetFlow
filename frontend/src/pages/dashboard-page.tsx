@@ -19,8 +19,12 @@ export function DashboardPage() {
     return (
       <div className="grid gap-4 md:gap-6">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Operations Center</h2>
-          <p className="text-sm text-muted-foreground">Live asset operations and attention queue</p>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Operations Center
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Live asset operations and attention queue
+          </p>
         </div>
         <DashboardError
           message={error instanceof Error ? error.message : undefined}
@@ -33,9 +37,11 @@ export function DashboardPage() {
   return (
     <div className="grid gap-4 md:gap-6">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Operations Center</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">
+          Operations Center
+        </h2>
         <p className="text-sm text-muted-foreground">
-          What needs attention and what just happened — analytics are secondary
+          What needs attention and what just happened
         </p>
       </div>
 

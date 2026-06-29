@@ -25,7 +25,12 @@ export function FormDialog({
   isSubmitting,
 }: FormDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title={title} description={description}>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -35,7 +40,11 @@ export function FormDialog({
         <div className="space-y-4">{children}</div>
         <DialogFooter>
           <DialogCloseButton onClose={() => onOpenChange(false)} />
-          <Button type="submit" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded-xl border border-blue-500/40 bg-blue-600 px-5 text-white shadow-[0_0_18px_rgba(59,130,246,0.35)] transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_25px_rgba(59,130,246,0.55)]"
+          >
             {isSubmitting ? "Saving…" : submitLabel}
           </Button>
         </DialogFooter>

@@ -37,8 +37,16 @@ export function LifecycleActionSheets({
 }: LifecycleActionSheetsProps) {
   const { toast } = useToast();
   const mutations = useLifecycleMutations(asset.id);
-  const { data: deptData } = useDepartmentsList({ page: 1, page_size: 100, is_active: true });
-  const { data: empData } = useEmployeesList({ page: 1, page_size: 100, is_active: true });
+  const { data: deptData } = useDepartmentsList({
+    page: 1,
+    page_size: 100,
+    is_active: true,
+  });
+  const { data: empData } = useEmployeesList({
+    page: 1,
+    page_size: 100,
+    is_active: true,
+  });
 
   const [employeeId, setEmployeeId] = useState("");
   const [notes, setNotes] = useState("");
@@ -77,7 +85,10 @@ export function LifecycleActionSheets({
 
   const handleReturn = async () => {
     try {
-      await mutations.return.mutateAsync({ returned_at: now(), notes: notes || null });
+      await mutations.return.mutateAsync({
+        returned_at: now(),
+        notes: notes || null,
+      });
       toast("Asset returned");
       onAssignOpenChange(false);
     } catch (err) {
@@ -110,7 +121,10 @@ export function LifecycleActionSheets({
       toast("Maintenance record created");
       onMaintenanceOpenChange(false);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to create maintenance", "error");
+      toast(
+        err instanceof Error ? err.message : "Failed to create maintenance",
+        "error",
+      );
     }
   };
 
@@ -118,12 +132,17 @@ export function LifecycleActionSheets({
     try {
       await mutations.createHealth.mutateAsync({
         health_score: healthScore ? parseFloat(healthScore) : null,
-        condition_rating: conditionRating ? parseInt(conditionRating, 10) : null,
+        condition_rating: conditionRating
+          ? parseInt(conditionRating, 10)
+          : null,
       });
       toast("Health snapshot recorded");
       onHealthOpenChange(false);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to record health", "error");
+      toast(
+        err instanceof Error ? err.message : "Failed to record health",
+        "error",
+      );
     }
   };
 
@@ -132,13 +151,20 @@ export function LifecycleActionSheets({
       <ActionSheet
         open={assignOpen}
         onOpenChange={onAssignOpenChange}
-        title={asset.current_status === "ASSIGNED" ? "Reassign Asset" : "Assign Asset"}
+        title={
+          asset.current_status === "ASSIGNED"
+            ? "Reassign Asset"
+            : "Assign Asset"
+        }
         description="Select an employee for this asset."
       >
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Employee</Label>
-            <Select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+            <Select
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+            >
               <option value="">Select employee</option>
               {empData?.items.map((e) => (
                 <option key={e.id} value={e.id}>
@@ -149,10 +175,18 @@ export function LifecycleActionSheets({
           </div>
           <div className="space-y-2">
             <Label>Notes</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </div>
           <div className="flex flex-col gap-2">
-            <Button type="button" onClick={handleAssign} disabled={!employeeId}>
+            <Button
+              type="button"
+              className="rounded-xl border border-blue-500/40 bg-blue-600 px-4 text-white shadow-[0_0_18px_rgba(59,130,246,0.35)] transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_22px_rgba(59,130,246,0.55)]"
+              onClick={handleAssign}
+              disabled={!employeeId}
+            >
               {asset.current_status === "ASSIGNED" ? "Reassign" : "Assign"}
             </Button>
             {asset.current_status === "ASSIGNED" ? (
@@ -173,7 +207,10 @@ export function LifecycleActionSheets({
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>To Department</Label>
-            <Select value={toDeptId} onChange={(e) => setToDeptId(e.target.value)}>
+            <Select
+              value={toDeptId}
+              onChange={(e) => setToDeptId(e.target.value)}
+            >
               <option value="">Select department</option>
               {deptData?.items.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -184,13 +221,24 @@ export function LifecycleActionSheets({
           </div>
           <div className="space-y-2">
             <Label>To Location</Label>
-            <Input value={toLocation} onChange={(e) => setToLocation(e.target.value)} />
+            <Input
+              value={toLocation}
+              onChange={(e) => setToLocation(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>Reason</Label>
-            <Textarea value={transferReason} onChange={(e) => setTransferReason(e.target.value)} />
+            <Textarea
+              value={transferReason}
+              onChange={(e) => setTransferReason(e.target.value)}
+            />
           </div>
-          <Button type="button" onClick={handleTransfer} disabled={!toDeptId || !toLocation}>
+          <Button
+            type="button"
+            className="rounded-xl border border-blue-500/40 bg-blue-600 px-4 text-white shadow-[0_0_18px_rgba(59,130,246,0.35)] transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_22px_rgba(59,130,246,0.55)]"
+            onClick={handleTransfer}
+            disabled={!toDeptId || !toLocation}
+          >
             Transfer
           </Button>
         </div>
@@ -205,7 +253,10 @@ export function LifecycleActionSheets({
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Type</Label>
-            <Select value={maintType} onChange={(e) => setMaintType(e.target.value)}>
+            <Select
+              value={maintType}
+              onChange={(e) => setMaintType(e.target.value)}
+            >
               <option value="PREVENTIVE">Preventive</option>
               <option value="CORRECTIVE">Corrective</option>
               <option value="INSPECTION">Inspection</option>
@@ -215,9 +266,18 @@ export function LifecycleActionSheets({
           </div>
           <div className="space-y-2">
             <Label>Description</Label>
-            <Textarea value={maintDesc} onChange={(e) => setMaintDesc(e.target.value)} required />
+            <Textarea
+              value={maintDesc}
+              onChange={(e) => setMaintDesc(e.target.value)}
+              required
+            />
           </div>
-          <Button type="button" onClick={handleMaintenance} disabled={!maintDesc}>
+          <Button
+            type="button"
+            className="rounded-xl border border-blue-500/40 bg-blue-600 px-4 text-white shadow-[0_0_18px_rgba(59,130,246,0.35)] transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_22px_rgba(59,130,246,0.55)]"
+            onClick={handleMaintenance}
+            disabled={!maintDesc}
+          >
             Create Record
           </Button>
         </div>
@@ -251,7 +311,11 @@ export function LifecycleActionSheets({
               onChange={(e) => setConditionRating(e.target.value)}
             />
           </div>
-          <Button type="button" onClick={handleHealth}>
+          <Button
+            className="rounded-xl border border-blue-500/40 bg-blue-600 px-4 text-white shadow-[0_0_18px_rgba(59,130,246,0.35)] transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_22px_rgba(59,130,246,0.55)]"
+            type="button"
+            onClick={handleHealth}
+          >
             Record Snapshot
           </Button>
         </div>

@@ -4,9 +4,18 @@ import type {
   HealthPrediction,
   RootCauseResponse,
 } from "../../intelligence/api/intelligence-api";
-import { Card, CardContent, CardHeader, CardTitle } from "../../../shared/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../../shared/components/ui/card";
 import { Skeleton } from "../../../shared/components/ui/skeleton";
-import { healthBandFromPct, HEALTH_BAND_TEXT, type HealthBand } from "../../../shared/lib/ops-semantics";
+import {
+  healthBandFromPct,
+  HEALTH_BAND_TEXT,
+  type HealthBand,
+} from "../../../shared/lib/ops-semantics";
 import { cn } from "../../../shared/lib/utils";
 
 type AssetHealthReportProps = {
@@ -35,7 +44,9 @@ export function AssetHealthReport({
   onExplain,
 }: AssetHealthReportProps) {
   const brief = rootCause?.enterprise_brief ?? enterpriseBrief;
-  const healthPct = prediction ? Math.round(prediction.health_score * 100) : null;
+  const healthPct = prediction
+    ? Math.round(prediction.health_score * 100)
+    : null;
   const band = healthPct != null ? healthBandFromPct(healthPct) : null;
 
   if (!prediction && !explanationSummary) {
@@ -50,9 +61,16 @@ export function AssetHealthReport({
 
   return (
     <div className="space-y-4">
-      <Card className={brief?.is_improvement ? "border-emerald-200 bg-emerald-50/20" : undefined}>
+      <Card
+        className={cn(
+          "rounded-3xl border border-slate-700 bg-[#111827] shadow-[0_0_25px_rgba(59,130,246,0.12)]",
+          brief?.is_improvement && "border-emerald-500/40",
+        )}
+      >
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">AI health report</CardTitle>
+          <CardTitle className="text-xl font-bold text-white">
+            AI health report
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-end gap-6">
@@ -61,11 +79,20 @@ export function AssetHealthReport({
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Overall health
                 </p>
-                <p className={cn("text-4xl font-semibold tabular-nums", band && bandBadgeClass(band))}>
+                <p
+                  className={cn(
+                    "text-5xl font-semibold tabular-nums",
+                    band && bandBadgeClass(band),
+                  )}
+                >
                   {healthPct}%
                 </p>
                 {band ? (
-                  <p className={cn("text-sm font-medium", bandBadgeClass(band))}>{brief?.health_band ?? band}</p>
+                  <p
+                    className={cn("text-sm font-medium", bandBadgeClass(band))}
+                  >
+                    {brief?.health_band ?? band}
+                  </p>
                 ) : null}
               </div>
             ) : null}
@@ -73,11 +100,14 @@ export function AssetHealthReport({
               <div className="space-y-1 text-sm">
                 <p>
                   <span className="text-muted-foreground">Confidence: </span>
-                  {brief?.confidence_label ?? `${Math.round(prediction.confidence * 100)}%`}
+                  {brief?.confidence_label ??
+                    `${Math.round(prediction.confidence * 100)}%`}
                 </p>
                 {brief?.remaining_useful_life ? (
                   <p>
-                    <span className="text-muted-foreground">Est. useful life: </span>
+                    <span className="text-muted-foreground">
+                      Est. useful life:{" "}
+                    </span>
                     {brief.remaining_useful_life}
                   </p>
                 ) : null}
@@ -94,30 +124,54 @@ export function AssetHealthReport({
           {brief ? (
             <div className="grid gap-4 md:grid-cols-2">
               <ReportSection title="What happened" body={brief.what_happened} />
-              <ReportSection title="Why we flagged this" body={brief.why_predicted} />
-              <ReportSection title="Business impact" body={brief.business_impact} />
-              <ReportSection title="Recommended action" body={brief.recommended_action} highlight />
+              <ReportSection
+                title="Why we flagged this"
+                body={brief.why_predicted}
+              />
+              <ReportSection
+                title="Business impact"
+                body={brief.business_impact}
+              />
+              <ReportSection
+                title="Recommended action"
+                body={brief.recommended_action}
+                highlight
+              />
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">{explanationSummary}</p>
+            <p className="text-sm text-muted-foreground">
+              {explanationSummary}
+            </p>
           )}
 
           {(brief || isExplainLoading) && (
-            <div className="grid gap-3 rounded-lg border bg-muted/20 p-4 sm:grid-cols-3">
-              <MiniStat label="Est. downtime" value={brief?.estimated_downtime ?? "—"} />
-              <MiniStat label="Est. effort" value={brief?.estimated_effort ?? "—"} />
-              <MiniStat label="Est. cost" value={brief?.estimated_cost ?? "—"} />
+            <div className="grid gap-3 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 sm:grid-cols-3">
+              <MiniStat
+                label="Est. downtime"
+                value={brief?.estimated_downtime ?? "—"}
+              />
+              <MiniStat
+                label="Est. effort"
+                value={brief?.estimated_effort ?? "—"}
+              />
+              <MiniStat
+                label="Est. cost"
+                value={brief?.estimated_cost ?? "—"}
+              />
             </div>
           )}
 
           {factors.length > 0 ? (
             <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
                 Contributing factors
               </p>
               <ul className="space-y-1.5">
                 {factors.slice(0, 5).map((f) => (
-                  <li key={f.factor} className="flex gap-2 text-sm text-muted-foreground">
+                  <li
+                    key={f.factor}
+                    className="flex gap-2 text-sm text-muted-foreground"
+                  >
                     <span className="text-foreground">•</span>
                     {f.message}
                   </li>
@@ -133,7 +187,9 @@ export function AssetHealthReport({
               disabled={isExplainLoading}
               onClick={onExplain}
             >
-              {isExplainLoading ? "Generating detailed brief…" : "Refresh detailed explanation"}
+              {isExplainLoading
+                ? "Generating detailed brief…"
+                : "Refresh detailed explanation"}
             </button>
             {isExplainLoading ? (
               <div className="mt-3 space-y-2">
@@ -141,8 +197,9 @@ export function AssetHealthReport({
                 <Skeleton className="h-4 w-5/6" />
                 <Skeleton className="h-4 w-4/6" />
               </div>
-            ) : rootCause?.root_cause_summary && rootCause.source === "ollama" ? (
-              <p className="mt-3 rounded-md border bg-card p-3 text-sm leading-relaxed">
+            ) : rootCause?.root_cause_summary &&
+              rootCause.source === "ollama" ? (
+              <p className="mt-3 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 text-sm leading-relaxed">
                 {rootCause.root_cause_summary}
               </p>
             ) : null}
@@ -163,8 +220,15 @@ function ReportSection({
   highlight?: boolean;
 }) {
   return (
-    <div className={cn("rounded-lg border p-3", highlight && "border-primary/20 bg-primary/5")}>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+    <div
+      className={cn(
+        "rounded-2xl border border-slate-700 bg-slate-900/60 p-4",
+        highlight && "border-blue-500/40 bg-blue-500/10",
+      )}
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
       <p className="mt-1 text-sm leading-relaxed">{body}</p>
     </div>
   );

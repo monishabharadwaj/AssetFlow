@@ -19,14 +19,22 @@ export function HealthRing({
   strokeWidth = 6,
   className,
 }: HealthRingProps) {
-  const normalized = score != null ? Math.min(1, Math.max(0, Number(score))) : null;
+  const normalized =
+    score != null ? Math.min(1, Math.max(0, Number(score))) : null;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset = normalized != null ? circumference * (1 - normalized) : circumference;
+  const offset =
+    normalized != null ? circumference * (1 - normalized) : circumference;
   const pct = normalized != null ? Math.round(normalized * 100) : null;
 
   return (
-    <div className={cn("relative inline-flex items-center justify-center", className)} style={{ width: size, height: size }}>
+    <div
+      className={cn(
+        "relative inline-flex items-center justify-center rounded-full bg-slate-900/70 shadow-[0_0_20px_rgba(59,130,246,0.18)]",
+        className,
+      )}
+      style={{ width: size, height: size }}
+    >
       <svg width={size} height={size} className="-rotate-90">
         <circle
           cx={size / 2}
@@ -34,7 +42,7 @@ export function HealthRing({
           r={radius}
           fill="none"
           strokeWidth={strokeWidth}
-          className="stroke-muted"
+          className="stroke-slate-700"
         />
         {normalized != null ? (
           <circle
@@ -46,11 +54,14 @@ export function HealthRing({
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
-            className={cn("transition-all", scoreColor(normalized))}
+            className={cn(
+              "transition-all duration-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.45)]",
+              scoreColor(normalized),
+            )}
           />
         ) : null}
       </svg>
-      <span className="absolute text-sm font-semibold tabular-nums">
+      <span className="absolute text-sm font-bold text-white tabular-nums">
         {pct != null ? `${pct}%` : "—"}
       </span>
     </div>

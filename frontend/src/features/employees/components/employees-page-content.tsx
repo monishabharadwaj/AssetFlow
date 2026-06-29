@@ -1,9 +1,16 @@
 import { useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import employeesIcon from "../../../assets/icons/employees.png";
 
 import { PageHeader } from "../../../shared/components/data-display/page-header";
-import { EntityDataTable, type ColumnDef } from "../../../shared/components/data-display/entity-data-table";
-import { EntityFiltersBar, FilterField } from "../../../shared/components/data-display/entity-filters-bar";
+import {
+  EntityDataTable,
+  type ColumnDef,
+} from "../../../shared/components/data-display/entity-data-table";
+import {
+  EntityFiltersBar,
+  FilterField,
+} from "../../../shared/components/data-display/entity-filters-bar";
 import { PaginationBar } from "../../../shared/components/data-display/pagination-bar";
 import { ActionSheet } from "../../../shared/components/feedback/action-sheet";
 import { ConfirmDialog } from "../../../shared/components/feedback/confirm-dialog";
@@ -15,11 +22,24 @@ import { Label } from "../../../shared/components/ui/label";
 import { Select } from "../../../shared/components/ui/select";
 import { formatDate } from "../../../shared/lib/format";
 import { useUrlSearchParams } from "../../../shared/hooks/use-url-search-params";
-import type { Allocation, Employee, EmployeeCreate } from "../../../shared/api/types";
+import type {
+  Allocation,
+  Employee,
+  EmployeeCreate,
+} from "../../../shared/api/types";
 import { useDepartmentsList } from "../../departments/hooks/use-departments";
-import { useEmployeeAllocations, useEmployeeMutations, useEmployeesList } from "../hooks/use-employees";
+import {
+  useEmployeeAllocations,
+  useEmployeeMutations,
+  useEmployeesList,
+} from "../hooks/use-employees";
 
-const DEFAULT_PARAMS = { page: 1, page_size: 20, search: "", department_id: "" };
+const DEFAULT_PARAMS = {
+  page: 1,
+  page_size: 20,
+  search: "",
+  department_id: "",
+};
 
 export function EmployeesPageContent() {
   const [params, setParams] = useUrlSearchParams(DEFAULT_PARAMS);
@@ -46,7 +66,11 @@ export function EmployeesPageContent() {
     job_title: "",
   });
 
-  const { data: allocData, isLoading: allocLoading } = useEmployeeAllocations(historyId ?? "", 1, 20);
+  const { data: allocData, isLoading: allocLoading } = useEmployeeAllocations(
+    historyId ?? "",
+    1,
+    20,
+  );
 
   const openCreate = () => {
     setEditEmp(null);
@@ -96,7 +120,10 @@ export function EmployeesPageContent() {
       toast("Employee deactivated");
       setDeactivateId(null);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to deactivate", "error");
+      toast(
+        err instanceof Error ? err.message : "Failed to deactivate",
+        "error",
+      );
     }
   };
 
@@ -104,22 +131,45 @@ export function EmployeesPageContent() {
 
   const columns: ColumnDef<Employee>[] = [
     { id: "code", header: "Code", cell: (r) => r.employee_code },
-    { id: "name", header: "Name", cell: (r) => `${r.first_name} ${r.last_name}` },
+    {
+      id: "name",
+      header: "Name",
+      cell: (r) => `${r.first_name} ${r.last_name}`,
+    },
     { id: "email", header: "Email", cell: (r) => r.email },
-    { id: "dept", header: "Department", cell: (r) => deptMap.get(r.department_id) ?? "—" },
+    {
+      id: "dept",
+      header: "Department",
+      cell: (r) => deptMap.get(r.department_id) ?? "—",
+    },
     { id: "title", header: "Job Title", cell: (r) => r.job_title ?? "—" },
     {
       id: "actions",
       header: "",
       cell: (r) => (
         <div className="flex justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => setHistoryId(r.id)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setHistoryId(r.id)}
+            className="rounded-xl text-slate-300 transition-all duration-300 hover:bg-purple-500/20 hover:text-purple-300 hover:shadow-[0_0_18px_rgba(168,85,247,0.45)]"
+          >
             History
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openEdit(r)}
+            className="rounded-xl text-slate-300 transition-all duration-300 hover:bg-blue-500/20 hover:text-blue-300 hover:shadow-[0_0_18px_rgba(59,130,246,0.45)]"
+          >
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDeactivateId(r.id)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDeactivateId(r.id)}
+            className="rounded-xl text-red-400 transition-all duration-300 hover:bg-red-500/15 hover:text-red-300 hover:shadow-[0_0_18px_rgba(239,68,68,0.45)]"
+          >
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
@@ -130,22 +180,46 @@ export function EmployeesPageContent() {
   const allocColumns: ColumnDef<Allocation>[] = [
     { id: "action", header: "Action", cell: (r) => r.action },
     { id: "asset", header: "Asset", cell: (r) => r.asset_id.slice(0, 8) + "…" },
-    { id: "allocated", header: "Allocated", cell: (r) => formatDate(r.allocated_at) },
-    { id: "returned", header: "Returned", cell: (r) => formatDate(r.returned_at) },
+    {
+      id: "allocated",
+      header: "Allocated",
+      cell: (r) => formatDate(r.allocated_at),
+    },
+    {
+      id: "returned",
+      header: "Returned",
+      cell: (r) => formatDate(r.returned_at),
+    },
   ];
 
   return (
     <div className="grid gap-4 md:gap-6">
-      <PageHeader
-        title="Employees"
-        description="Manage employees and view allocation history."
-        actions={
-          <Button type="button" onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Employee
-          </Button>
-        }
-      />
+      <div className="flex flex-col gap-4 rounded-3xl border border-slate-700 bg-[#111827] p-6 shadow-[0_0_25px_rgba(59,130,246,0.12)] md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-5">
+          <img
+            src={employeesIcon}
+            alt="Employees"
+            className="h-16 w-16 object-contain drop-shadow-[0_0_18px_rgba(59,130,246,0.55)]"
+          />
+
+          <div>
+            <h2 className="text-3xl font-bold text-white">Employees</h2>
+
+            <p className="mt-1 text-sm text-slate-400">
+              Manage employees and view allocation history.
+            </p>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          onClick={openCreate}
+          className="rounded-xl border border-blue-500/40 bg-blue-600 px-4 text-white shadow-[0_0_18px_rgba(59,130,246,0.35)] transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_22px_rgba(59,130,246,0.55)]"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add Employee
+        </Button>
+      </div>
 
       <EntityFiltersBar>
         <FilterField label="Search" className="min-w-[160px] flex-1">
@@ -158,7 +232,9 @@ export function EmployeesPageContent() {
         <FilterField label="Department">
           <Select
             value={params.department_id}
-            onChange={(e) => setParams({ department_id: e.target.value, page: 1 })}
+            onChange={(e) =>
+              setParams({ department_id: e.target.value, page: 1 })
+            }
           >
             <option value="">All departments</option>
             {deptData?.items.map((d) => (
@@ -170,7 +246,12 @@ export function EmployeesPageContent() {
         </FilterField>
       </EntityFiltersBar>
 
-      <EntityDataTable columns={columns} data={data?.items ?? []} isLoading={isLoading} rowKey={(r) => r.id} />
+      <EntityDataTable
+        columns={columns}
+        data={data?.items ?? []}
+        isLoading={isLoading}
+        rowKey={(r) => r.id}
+      />
 
       {data ? (
         <PaginationBar
@@ -194,7 +275,9 @@ export function EmployeesPageContent() {
             <Label>Department</Label>
             <Select
               value={form.department_id}
-              onChange={(e) => setForm({ ...form, department_id: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, department_id: e.target.value })
+              }
             >
               <option value="">Select department</option>
               {deptData?.items.map((d) => (
@@ -208,7 +291,9 @@ export function EmployeesPageContent() {
             <Label>Employee Code</Label>
             <Input
               value={form.employee_code}
-              onChange={(e) => setForm({ ...form, employee_code: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, employee_code: e.target.value })
+              }
             />
           </div>
           <div className="space-y-2">

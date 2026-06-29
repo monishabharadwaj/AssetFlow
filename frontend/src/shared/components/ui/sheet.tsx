@@ -14,7 +14,14 @@ type SheetProps = {
   side?: "right" | "bottom";
 };
 
-export function Sheet({ open, onOpenChange, title, description, children, side = "right" }: SheetProps) {
+export function Sheet({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  side = "right",
+}: SheetProps) {
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -28,23 +35,35 @@ export function Sheet({ open, onOpenChange, title, description, children, side =
 
   return createPortal(
     <div className="fixed inset-0 z-50">
-      <div className="fixed inset-0 bg-black/50" onClick={() => onOpenChange(false)} />
+      <div
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={() => onOpenChange(false)}
+      />
       <div
         className={cn(
-          "fixed z-50 flex flex-col border bg-card shadow-lg",
+          "fixed z-50 flex flex-col rounded-l-3xl border border-slate-700 bg-[#111827] text-white shadow-[0_0_35px_rgba(59,130,246,0.18)]",
           side === "right" && "inset-y-0 right-0 h-full w-full max-w-md",
-          side === "bottom" && "inset-x-0 bottom-0 max-h-[90vh] w-full rounded-t-lg",
+          side === "bottom" &&
+            "inset-x-0 bottom-0 max-h-[90vh] w-full rounded-t-lg",
         )}
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-start justify-between border-b p-4">
+        <div className="flex items-start justify-between border-b border-slate-700 px-6 py-5">
           <div>
-            <h2 className="text-lg font-semibold">{title}</h2>
-            {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+            <h2 className="text-xl font-bold text-white">{title}</h2>
+            {description ? (
+              <p className="mt-1 text-sm text-slate-400">{description}</p>
+            ) : null}
           </div>
-          <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-            <X className="h-4 w-4" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => onOpenChange(false)}
+            className="rounded-xl text-slate-400 transition-all duration-300 hover:bg-blue-500/20 hover:text-white hover:shadow-[0_0_18px_rgba(59,130,246,0.45)]"
+          >
+            <X className="h-5 w-5" />
           </Button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">{children}</div>

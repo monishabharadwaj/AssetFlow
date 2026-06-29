@@ -1,10 +1,17 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import AssetsIcon from "../../../assets/icons/Assets.png";
 
 import { PageHeader } from "../../../shared/components/data-display/page-header";
-import { EntityDataTable, type ColumnDef } from "../../../shared/components/data-display/entity-data-table";
-import { EntityFiltersBar, FilterField } from "../../../shared/components/data-display/entity-filters-bar";
+import {
+  EntityDataTable,
+  type ColumnDef,
+} from "../../../shared/components/data-display/entity-data-table";
+import {
+  EntityFiltersBar,
+  FilterField,
+} from "../../../shared/components/data-display/entity-filters-bar";
 import { PaginationBar } from "../../../shared/components/data-display/pagination-bar";
 import { StatusBadge } from "../../../shared/components/data-display/status-badge";
 import { ConfirmDialog } from "../../../shared/components/feedback/confirm-dialog";
@@ -17,7 +24,11 @@ import { Select } from "../../../shared/components/ui/select";
 import { useUrlSearchParams } from "../../../shared/hooks/use-url-search-params";
 import type { Asset, AssetStatus } from "../../../shared/api/types";
 import { useDepartmentsList } from "../../departments/hooks/use-departments";
-import { useAssetMutations, useAssetsList, useAssetsSearch } from "../hooks/use-assets";
+import {
+  useAssetMutations,
+  useAssetsList,
+  useAssetsSearch,
+} from "../hooks/use-assets";
 import { AssetFormDialog } from "./asset-form-dialog";
 
 const STATUS_OPTIONS: AssetStatus[] = [
@@ -58,7 +69,11 @@ export function AssetsPageContent() {
     Boolean(params.current_department_id);
 
   const listQuery = useAssetsList(
-    { page: params.page, page_size: params.page_size, is_active: params.is_active },
+    {
+      page: params.page,
+      page_size: params.page_size,
+      is_active: params.is_active,
+    },
     !hasSearchFilters,
   );
 
@@ -86,13 +101,20 @@ export function AssetsPageContent() {
       id: "tag",
       header: "Tag",
       cell: (row) => (
-        <Link to={`/assets/${row.id}`} className="font-medium text-primary hover:underline">
+        <Link
+          to={`/assets/${row.id}`}
+          className="font-medium text-primary hover:underline"
+        >
           {row.asset_tag}
         </Link>
       ),
     },
     { id: "name", header: "Name", cell: (row) => row.name },
-    { id: "status", header: "Status", cell: (row) => <StatusBadge status={row.current_status} /> },
+    {
+      id: "status",
+      header: "Status",
+      cell: (row) => <StatusBadge status={row.current_status} />,
+    },
     {
       id: "department",
       header: "Department",
@@ -105,13 +127,32 @@ export function AssetsPageContent() {
       className: "w-[120px]",
       cell: (row) => (
         <div className="flex justify-end gap-1">
-          <Link to={`/assets/${row.id}`} className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
+          <Link
+            to={`/assets/${row.id}`}
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "icon" }),
+              "rounded-xl text-slate-300 transition-all duration-300 hover:bg-blue-500/20 hover:text-blue-300 hover:shadow-[0_0_18px_rgba(59,130,246,0.45)]",
+            )}
+          >
             <Eye className="h-4 w-4" />
           </Link>
-          <Button variant="ghost" size="icon" onClick={() => { setEditAsset(row); setFormOpen(true); }}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-xl text-slate-300 transition-all duration-300 hover:bg-blue-500/20 hover:text-blue-300 hover:shadow-[0_0_18px_rgba(59,130,246,0.45)]"
+            onClick={() => {
+              setEditAsset(row);
+              setFormOpen(true);
+            }}
+          >
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDeactivateId(row.id)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-xl text-red-400 transition-all duration-300 hover:bg-red-500/15 hover:text-red-300 hover:shadow-[0_0_18px_rgba(239,68,68,0.45)]"
+            onClick={() => setDeactivateId(row.id)}
+          >
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
@@ -126,29 +167,44 @@ export function AssetsPageContent() {
       toast("Asset deactivated");
       setDeactivateId(null);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to deactivate", "error");
+      toast(
+        err instanceof Error ? err.message : "Failed to deactivate",
+        "error",
+      );
     }
   };
 
   return (
     <div className="grid gap-4 md:gap-6">
-      <PageHeader
-        title="Assets"
-        description="Search, register, and manage organizational assets."
-        actions={
-          <Button
-            type="button"
-            onClick={() => {
-              setEditAsset(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Register Asset
-          </Button>
-        }
-      />
+      <div className="flex flex-col gap-4 rounded-3xl border border-slate-700 bg-[#111827] p-6 shadow-[0_0_25px_rgba(59,130,246,0.12)] md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-5">
+          <img
+            src={AssetsIcon}
+            alt="Assets"
+            className="h-16 w-16 object-contain drop-shadow-[0_0_18px_rgba(59,130,246,0.55)]"
+          />
 
+          <div>
+            <h2 className="text-3xl font-bold text-white">Assets</h2>
+
+            <p className="mt-1 text-sm text-slate-400">
+              Search, register and manage organizational assets.
+            </p>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          onClick={() => {
+            setEditAsset(null);
+            setFormOpen(true);
+          }}
+          className="rounded-xl border border-blue-500/40 bg-blue-600 px-4 text-white shadow-[0_0_18px_rgba(59,130,246,0.35)] transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_22px_rgba(59,130,246,0.55)]"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Register Asset
+        </Button>
+      </div>
       <EntityFiltersBar>
         <FilterField label="Name" className="min-w-[160px] flex-1">
           <Input
@@ -167,7 +223,9 @@ export function AssetsPageContent() {
         <FilterField label="Status">
           <Select
             value={params.current_status}
-            onChange={(e) => setParams({ current_status: e.target.value, page: 1 })}
+            onChange={(e) =>
+              setParams({ current_status: e.target.value, page: 1 })
+            }
           >
             <option value="">All statuses</option>
             {STATUS_OPTIONS.map((s) => (
@@ -180,7 +238,9 @@ export function AssetsPageContent() {
         <FilterField label="Department">
           <Select
             value={params.current_department_id}
-            onChange={(e) => setParams({ current_department_id: e.target.value, page: 1 })}
+            onChange={(e) =>
+              setParams({ current_department_id: e.target.value, page: 1 })
+            }
           >
             <option value="">All departments</option>
             {deptData?.items.map((d) => (
@@ -193,7 +253,10 @@ export function AssetsPageContent() {
       </EntityFiltersBar>
 
       {query.isError ? (
-        <EmptyState title="Failed to load assets" description={query.error?.message} />
+        <EmptyState
+          title="Failed to load assets"
+          description={query.error?.message}
+        />
       ) : (
         <>
           <EntityDataTable

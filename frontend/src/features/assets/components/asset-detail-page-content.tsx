@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
-import { EntityDataTable, type ColumnDef } from "../../../shared/components/data-display/entity-data-table";
+import {
+  EntityDataTable,
+  type ColumnDef,
+} from "../../../shared/components/data-display/entity-data-table";
 import { PaginationBar } from "../../../shared/components/data-display/pagination-bar";
 import { StatusBadge } from "../../../shared/components/data-display/status-badge";
 import {
@@ -14,7 +17,12 @@ import { Button } from "../../../shared/components/ui/button";
 import { Card, CardContent } from "../../../shared/components/ui/card";
 import { formatCurrency, formatDate } from "../../../shared/lib/format";
 import { formatDayHeader } from "../../../shared/lib/date";
-import type { Allocation, HealthHistory, Maintenance, Transfer } from "../../../shared/api/types";
+import type {
+  Allocation,
+  HealthHistory,
+  Maintenance,
+  Transfer,
+} from "../../../shared/api/types";
 import { useDepartmentsList } from "../../departments/hooks/use-departments";
 import { useEmployeesList } from "../../employees/hooks/use-employees";
 import { useAsset, useLookups } from "../hooks/use-assets";
@@ -36,8 +44,14 @@ import { HealthTrendChart } from "./health-trend-chart";
 import { AssetHealthReport } from "./asset-health-report";
 import { LifecycleActionSheets } from "./lifecycle-action-sheets";
 
-
-const TABS = ["overview", "timeline", "allocations", "transfers", "maintenance", "health"] as const;
+const TABS = [
+  "overview",
+  "timeline",
+  "allocations",
+  "transfers",
+  "maintenance",
+  "health",
+] as const;
 type Tab = (typeof TABS)[number];
 
 export function AssetDetailPageContent() {
@@ -53,7 +67,10 @@ export function AssetDetailPageContent() {
 
   const { data: asset, isLoading, isError, error } = useAsset(assetId);
   const { types } = useLookups();
-  const { data: departmentsData } = useDepartmentsList({ page: 1, page_size: 200 });
+  const { data: departmentsData } = useDepartmentsList({
+    page: 1,
+    page_size: 200,
+  });
   const { data: employeesData } = useEmployeesList({ page: 1, page_size: 500 });
 
   const timeline = useAssetTimeline(assetId, page, 20);
@@ -68,7 +85,6 @@ export function AssetDetailPageContent() {
   const [explainLlm, setExplainLlm] = useState(false);
   const rootCause = useAssetRootCause(assetId, explainLlm, tab === "health");
 
-
   const departmentMap = useMemo(
     () => new Map((departmentsData?.items ?? []).map((d) => [d.id, d.name])),
     [departmentsData],
@@ -76,13 +92,18 @@ export function AssetDetailPageContent() {
   const employeeMap = useMemo(
     () =>
       new Map(
-        (employeesData?.items ?? []).map((e) => [e.id, `${e.first_name} ${e.last_name}`]),
+        (employeesData?.items ?? []).map((e) => [
+          e.id,
+          `${e.first_name} ${e.last_name}`,
+        ]),
       ),
     [employeesData],
   );
 
   const typeName = types.data?.find((t) => t.id === asset?.asset_type_id)?.name;
-  const departmentName = asset ? departmentMap.get(asset.current_department_id) : undefined;
+  const departmentName = asset
+    ? departmentMap.get(asset.current_department_id)
+    : undefined;
   const assigneeName = asset?.current_assigned_employee_id
     ? employeeMap.get(asset.current_assigned_employee_id)
     : undefined;
@@ -117,8 +138,16 @@ export function AssetDetailPageContent() {
       header: "Employee",
       cell: (r) => employeeMap.get(r.employee_id) ?? "Unknown employee",
     },
-    { id: "allocated", header: "Allocated", cell: (r) => formatDate(r.allocated_at) },
-    { id: "returned", header: "Returned", cell: (r) => formatDate(r.returned_at) },
+    {
+      id: "allocated",
+      header: "Allocated",
+      cell: (r) => formatDate(r.allocated_at),
+    },
+    {
+      id: "returned",
+      header: "Returned",
+      cell: (r) => formatDate(r.returned_at),
+    },
   ];
 
   const transferColumns: ColumnDef<Transfer>[] = [
@@ -138,9 +167,17 @@ export function AssetDetailPageContent() {
 
   const maintenanceColumns: ColumnDef<Maintenance>[] = [
     { id: "type", header: "Type", cell: (r) => r.maintenance_type },
-    { id: "status", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
+    {
+      id: "status",
+      header: "Status",
+      cell: (r) => <StatusBadge status={r.status} />,
+    },
     { id: "desc", header: "Description", cell: (r) => r.description },
-    { id: "scheduled", header: "Scheduled", cell: (r) => formatDate(r.scheduled_date) },
+    {
+      id: "scheduled",
+      header: "Scheduled",
+      cell: (r) => formatDate(r.scheduled_date),
+    },
   ];
 
   const healthColumns: ColumnDef<HealthHistory>[] = [
@@ -148,9 +185,16 @@ export function AssetDetailPageContent() {
     {
       id: "score",
       header: "Health Score",
-      cell: (r) => (r.health_score != null ? `${Math.round(Number(r.health_score) * 100)}%` : "—"),
+      cell: (r) =>
+        r.health_score != null
+          ? `${Math.round(Number(r.health_score) * 100)}%`
+          : "—",
     },
-    { id: "rating", header: "Condition", cell: (r) => r.condition_rating ?? "—" },
+    {
+      id: "rating",
+      header: "Condition",
+      cell: (r) => r.condition_rating ?? "—",
+    },
     { id: "failures", header: "Failures", cell: (r) => r.failure_count },
   ];
 
@@ -160,21 +204,46 @@ export function AssetDetailPageContent() {
 
   const actionButtons = (
     <>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setAssignOpen(true)}>
+      <Button
+        type="button"
+        variant="secondary"
+        className="rounded-xl border border-slate-700 bg-slate-800/70 text-slate-300 shadow-[0_0_10px_rgba(59,130,246,0.15)] transition-all duration-300 hover:border-blue-500/60 hover:bg-slate-700 hover:text-white hover:shadow-[0_0_20px_rgba(59,130,246,0.45)]"
+        size="sm"
+        onClick={() => setAssignOpen(true)}
+      >
         {asset.current_status === "ASSIGNED" ? "Reassign" : "Assign"}
       </Button>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setTransferOpen(true)}>
+      <Button
+        type="button"
+        variant="secondary"
+        className="rounded-xl border border-slate-700 bg-slate-800/70 text-slate-300 shadow-[0_0_10px_rgba(59,130,246,0.15)] transition-all duration-300 hover:border-blue-500/60 hover:bg-slate-700 hover:text-white hover:shadow-[0_0_20px_rgba(59,130,246,0.45)]"
+        size="sm"
+        onClick={() => setTransferOpen(true)}
+      >
         Transfer
       </Button>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setMaintenanceOpen(true)}>
+      <Button
+        type="button"
+        variant="secondary"
+        className="rounded-xl border border-slate-700 bg-slate-800/70 text-slate-300 shadow-[0_0_10px_rgba(59,130,246,0.15)] transition-all duration-300 hover:border-blue-500/60 hover:bg-slate-700 hover:text-white hover:shadow-[0_0_20px_rgba(59,130,246,0.45)]"
+        size="sm"
+        onClick={() => setMaintenanceOpen(true)}
+      >
         Maintenance
       </Button>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setHealthOpen(true)}>
+      <Button
+        type="button"
+        variant="secondary"
+        className="rounded-xl border border-slate-700 bg-slate-800/70 text-slate-300 shadow-[0_0_10px_rgba(59,130,246,0.15)] transition-all duration-300 hover:border-blue-500/60 hover:bg-slate-700 hover:text-white hover:shadow-[0_0_20px_rgba(59,130,246,0.45)]"
+        size="sm"
+        onClick={() => setHealthOpen(true)}
+      >
         Health
       </Button>
       <Button
         type="button"
         variant="default"
+        className="rounded-xl border border-blue-500/40 bg-blue-600 px-4 text-white shadow-[0_0_18px_rgba(59,130,246,0.35)] transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_22px_rgba(59,130,246,0.55)]"
         size="sm"
         disabled={runPrediction.isPending}
         onClick={() => void runPrediction.mutateAsync()}
@@ -205,7 +274,7 @@ export function AssetDetailPageContent() {
             variant={tab === t ? "default" : "ghost"}
             size="sm"
             onClick={() => setTab(t)}
-            className="capitalize"
+            className="capitalize transition-all duration-300 hover:border-blue-500/60 hover:bg-slate-700 hover:text-white hover:shadow-[0_0_20px_rgba(59,130,246,0.45)]"
           >
             {t}
           </Button>
@@ -220,9 +289,18 @@ export function AssetDetailPageContent() {
               <MetaItem label="Manufacturer" value={asset.manufacturer} />
               <MetaItem label="Model" value={asset.model} />
               <MetaItem label="Asset Type" value={typeName} />
-              <MetaItem label="Purchase Date" value={formatDate(asset.purchase_date)} />
-              <MetaItem label="Purchase Cost" value={formatCurrency(asset.purchase_cost)} />
-              <MetaItem label="Warranty Expiry" value={formatDate(asset.warranty_expiry)} />
+              <MetaItem
+                label="Purchase Date"
+                value={formatDate(asset.purchase_date)}
+              />
+              <MetaItem
+                label="Purchase Cost"
+                value={formatCurrency(asset.purchase_cost)}
+              />
+              <MetaItem
+                label="Warranty Expiry"
+                value={formatDate(asset.warranty_expiry)}
+              />
               <MetaItem label="Active" value={asset.is_active ? "Yes" : "No"} />
               <MetaItem label="Created" value={formatDate(asset.created_at)} />
             </CardContent>
@@ -232,9 +310,14 @@ export function AssetDetailPageContent() {
               <CardContent className="space-y-2 pt-6">
                 <h3 className="text-sm font-semibold">AI Recommendations</h3>
                 {assetRecommendations.data.items.map((rec) => (
-                  <div key={`${rec.asset_id}-${rec.maintenance_type}`} className="space-y-0.5">
+                  <div
+                    key={`${rec.asset_id}-${rec.maintenance_type}`}
+                    className="space-y-0.5"
+                  >
                     <p className="text-sm font-medium">{rec.title}</p>
-                    <p className="text-sm text-muted-foreground">{rec.rationale}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {rec.rationale}
+                    </p>
                   </div>
                 ))}
               </CardContent>
@@ -248,7 +331,10 @@ export function AssetDetailPageContent() {
           {timeline.isLoading ? (
             <Skeleton className="h-24 w-full" />
           ) : timelineGroups.length === 0 ? (
-            <EmptyState title="No timeline events" description="Lifecycle events will appear here." />
+            <EmptyState
+              title="No timeline events"
+              description="Lifecycle events will appear here."
+            />
           ) : (
             timelineGroups.map((group) => (
               <div key={group.day} className="space-y-3">
@@ -397,7 +483,13 @@ export function AssetDetailPageContent() {
   );
 }
 
-function MetaItem({ label, value }: { label: string; value: string | null | undefined }) {
+function MetaItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) {
   return (
     <div>
       <p className="text-xs font-medium text-muted-foreground">{label}</p>

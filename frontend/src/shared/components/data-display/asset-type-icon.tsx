@@ -28,7 +28,11 @@ type AssetTypeIconProps = {
   iconClassName?: string;
 };
 
-export function AssetTypeIcon({ typeName, className, iconClassName }: AssetTypeIconProps) {
+export function AssetTypeIcon({
+  typeName,
+  className,
+  iconClassName,
+}: AssetTypeIconProps) {
   const Icon = (typeName && TYPE_ICONS[typeName]) || Package;
   return (
     <div
