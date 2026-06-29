@@ -202,6 +202,14 @@ class ReportsAnalyticsService:
             ):
                 source = "ollama"
 
+        if use_ai and source == "analyst_template":
+            executive = self._simplify_executive_sections(executive)
+            drift_section.ai_insight = self._simplify_text(drift_section.ai_insight)
+            cost_section.ai_insight = self._simplify_text(cost_section.ai_insight)
+            replacement_section.ai_insight = self._simplify_text(replacement_section.ai_insight)
+            maintenance_section.ai_insight = self._simplify_text(maintenance_section.ai_insight)
+            source = "enhanced_template"
+
         return ReportsAnalyticsResponse(
             generated_at=datetime.now(timezone.utc),
             scope_label=scope_label,
@@ -514,3 +522,29 @@ class ReportsAnalyticsService:
             return await ollama_generate(prompt, timeout=25.0)
         except Exception:
             return None
+
+    @staticmethod
+    def _simplify_text(text: str) -> str:
+        if not text:
+            return text
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        if len(sentences) <= 2:
+            return text
+        return " ".join(sentences[:2])
+
+    def _simplify_executive_sections(
+        self, sections: list[ReportInsightSection]
+    ) -> list[ReportInsightSection]:
+        simplified: list[ReportInsightSection] = []
+        for section in sections:
+            summary = self._simplify_text(section.summary)
+            bullets = [self._simplify_text(b) for b in section.bullets[:4]]
+            simplified.append(
+                ReportInsightSection(
+                    key=section.key,
+                    title=section.title,
+                    summary=summary,
+                    bullets=bullets,
+                )
+            )
+        return simplified

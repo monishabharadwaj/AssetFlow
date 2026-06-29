@@ -1,41 +1,48 @@
-import { Box, UserPlus, Wrench } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@tanstack/react-router";
+import { Boxes, Building2, Users, Wrench } from "lucide-react";
 
-import { usePermissions } from "../../auth/use-permissions";
-import { buttonVariants } from "../../../shared/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../shared/components/ui/card";
-import { cn } from "../../../shared/lib/utils";
+import { Card, CardHeader } from "@/components/ui-bits";
+import { canAccessNav } from "@/features/auth/permissions";
+import { useAuth } from "@/lib/auth-context";
+import { cn } from "@/lib/utils";
+
+const ACTIONS = [
+  { label: "Assets", to: "/assets", icon: Boxes, description: "Search and manage fleet" },
+  { label: "Maintenance", to: "/maintenance", icon: Wrench, description: "Work queue & scheduling" },
+  { label: "Departments", to: "/departments", icon: Building2, description: "Org structure" },
+  { label: "Employees", to: "/employees", icon: Users, description: "Employee directory" },
+] as const;
 
 export function QuickActionsPanel() {
-  const { can } = usePermissions();
-  const canWriteAssets = can("assets:write");
+  const { user } = useAuth();
+  const visible = ACTIONS.filter((a) => canAccessNav(user?.role, a.to));
 
-  if (!canWriteAssets) {
-    return null;
-  }
-
-  const linkClass = cn(buttonVariants({ variant: "secondary" }), "w-full justify-start");
+  if (visible.length === 0) return null;
 
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle>Quick Actions</CardTitle>
-        <CardDescription>Common lifecycle operations</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <Link to="/assets?create=true" className={linkClass}>
-          <Box className="mr-2 h-4 w-4" />
-          Register Asset
-        </Link>
-        <Link to="/assets" className={linkClass}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Assign Asset
-        </Link>
-        <Link to="/maintenance" className={linkClass}>
-          <Wrench className="mr-2 h-4 w-4" />
-          Create Maintenance
-        </Link>
-      </CardContent>
+    <Card>
+      <CardHeader title="Quick actions" subtitle="Jump to common operations" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {visible.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link
+              key={action.to}
+              to={action.to}
+              className={cn(
+                "rounded-xl border border-border p-4 hover:bg-accent/30 transition-colors",
+                "flex flex-col gap-2",
+              )}
+            >
+              <div className="size-9 rounded-lg bg-primary/15 grid place-items-center text-[oklch(0.82_0.18_285)]">
+                <Icon className="size-4" />
+              </div>
+              <div className="font-medium text-sm">{action.label}</div>
+              <div className="text-xs text-muted-foreground">{action.description}</div>
+            </Link>
+          );
+        })}
+      </div>
     </Card>
   );
 }

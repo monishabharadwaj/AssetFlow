@@ -1,15 +1,6 @@
-import { apiGet, apiPatch, apiPost } from "../../shared/api/client";
-import type {
-  AuthUser,
-  ChangePasswordRequest,
-  LoginRequest,
-  MyWorkspaceResponse,
-  PasswordResetResponse,
-  TokenResponse,
-  UserAdminUpdate,
-  UserCreateRequest,
-  UserCreateResponse,
-} from "./types";
+import { apiGet, apiPost } from "@/lib/api";
+import type { AuthUser, ChangePasswordRequest, LoginRequest, TokenResponse } from "@/lib/types/backend";
+import type { User } from "@/lib/types/ui";
 
 export function loginRequest(body: LoginRequest): Promise<TokenResponse> {
   return apiPost<TokenResponse>("/auth/login", body);
@@ -23,22 +14,16 @@ export function changePasswordRequest(body: ChangePasswordRequest): Promise<Auth
   return apiPost<AuthUser>("/auth/change-password", body);
 }
 
-export function fetchMyWorkspace(): Promise<MyWorkspaceResponse> {
-  return apiGet<MyWorkspaceResponse>("/dashboard/my-workspace");
-}
-
-export function listUserAccounts(): Promise<AuthUser[]> {
-  return apiGet<AuthUser[]>("/auth/users");
-}
-
-export function createUserAccount(body: UserCreateRequest): Promise<UserCreateResponse> {
-  return apiPost<UserCreateResponse>("/auth/users", body);
-}
-
-export function updateUserAccount(userId: string, body: UserAdminUpdate): Promise<AuthUser> {
-  return apiPatch<AuthUser>(`/auth/users/${userId}`, body);
-}
-
-export function resetUserPassword(userId: string): Promise<PasswordResetResponse> {
-  return apiPost<PasswordResetResponse>(`/auth/users/${userId}/reset-password`, {});
+export function mapAuthUser(user: AuthUser): User {
+  return {
+    id: user.id,
+    email: user.email,
+    full_name: user.full_name,
+    role: user.role,
+    department_id: user.department_id,
+    department_name: user.department_name,
+    must_change_password: user.must_change_password,
+    job_title: user.job_title,
+    employee_code: user.employee_code,
+  };
 }

@@ -1,6 +1,4 @@
-import { BarChart3, Building2, ClipboardList, LayoutGrid, Users } from "lucide-react";
-
-import type { UserRole } from "./types";
+import type { UserRole } from "@/lib/types/backend";
 
 export type Permission =
   | "departments:read"
@@ -62,16 +60,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   ]),
 };
 
-export const NAV_ITEMS = [
-  { label: "Operations", to: "/dashboard", permission: "dashboard:read" as Permission, icon: LayoutGrid },
-  { label: "Assets", to: "/assets", permission: "assets:read" as Permission, icon: BarChart3 },
-  { label: "Maintenance", to: "/maintenance", permission: "maintenance:read" as Permission, icon: ClipboardList },
-  { label: "Departments", to: "/departments", permission: "departments:read" as Permission, icon: Building2 },
-  { label: "Employees", to: "/employees", permission: "employees:read" as Permission, icon: Users },
-  { label: "Reports", to: "/reports", permission: "reports:read" as Permission, icon: BarChart3 },
-] as const;
-
-const ROUTE_PERMISSIONS: Record<string, Permission> = {
+export const NAV_PERMISSIONS: Record<string, Permission> = {
   "/dashboard": "dashboard:read",
   "/assets": "assets:read",
   "/maintenance": "maintenance:read",
@@ -80,6 +69,8 @@ const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/reports": "reports:read",
   "/settings": "settings:read",
 };
+
+const ROUTE_PERMISSIONS: Record<string, Permission> = NAV_PERMISSIONS;
 
 export function hasPermission(role: UserRole | undefined, permission: Permission): boolean {
   if (!role) return false;
@@ -97,6 +88,8 @@ export function canAccessPath(role: UserRole | undefined, pathname: string): boo
   return hasPermission(role, permission);
 }
 
-export function visibleNavItems(role: UserRole | undefined) {
-  return NAV_ITEMS.filter((item) => hasPermission(role, item.permission));
+export function canAccessNav(role: UserRole | undefined, path: string): boolean {
+  const permission = NAV_PERMISSIONS[path];
+  if (!permission) return true;
+  return hasPermission(role, permission);
 }

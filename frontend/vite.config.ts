@@ -1,11 +1,24 @@
 import path from "node:path";
 import os from "node:os";
-import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react()],
-  // Keep Vite's dep cache outside OneDrive to avoid EPERM/lock errors on Windows.
+  plugins: [
+    tanstackRouter({
+      target: "react",
+      autoCodeSplitting: true,
+    }),
+    react(),
+    tailwindcss(),
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
   cacheDir: path.join(os.tmpdir(), "vite-cache-assetflow"),
   server: {
     port: 5173,
