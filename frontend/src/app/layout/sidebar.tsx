@@ -7,6 +7,7 @@ import {
   Users,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import logoIcon from "../../assets/icons/logo.png";
 
 import { cn } from "../../shared/lib/utils";
 
@@ -21,13 +22,20 @@ const navItems = [
 export function Sidebar() {
   return (
     <aside className="hidden w-72 border-r border-slate-800 bg-[#111827] md:flex md:flex-col">
-      <div className="border-b border-white/10 px-6 py-4">
-        <p className="text-xs uppercase tracking-wide text-white/40">
-          AssetFlow AI
-        </p>
-        <h1 className="mt-1 text-lg font-semibold text-white">
-          Operations Console
-        </h1>
+      <div className="border-b border-white/10 px-6 py-4 flex items-center gap-3">
+        <img
+          src={logoIcon}
+          alt="AssetFlow AI Logo"
+          className="h-20 w-20 object-contain drop-shadow-[0_0_18px_rgba(167,139,250,0.55)] animate-pulse"
+        />
+        <div className="flex flex-col">
+          <span className="text-sm text-purple-400/70 tracking-widest uppercase font-medium">
+            ASSETFLOW AI
+          </span>
+          <span className="text-3xl font-bold text-white drop-shadow-[0_0_12px_rgba(167,139,250,0.45)]">
+            Operations Console
+          </span>
+        </div>
       </div>
       <nav className="space-y-1 px-3 py-4">
         {navItems.map((item) => (
