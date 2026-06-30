@@ -17,6 +17,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { AssetFlowLogo } from "@/features/auth/components/assetflow-logo";
 import { mapNotifications } from "@/lib/adapters/notifications";
 import {
   buildAttentionFallback,
@@ -32,7 +33,7 @@ import { useMarkAllNotificationsRead, useMarkNotificationRead } from "@/features
 import { cn } from "@/lib/utils";
 import { Pill, Skeleton } from "@/components/ui-bits";
 import { UserProfileMenu } from "@/features/auth/components/user-profile-menu";
-import { api } from "@/lib/api";
+import { api, ASSISTANT_CHAT_TIMEOUT_MS } from "@/lib/api";
 import {
   Sheet,
   SheetContent,
@@ -73,9 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       >
         <div className="h-16 flex items-center gap-2 px-4 border-b border-sidebar-border">
-          <div className="size-8 rounded-lg bg-gradient-to-br from-[oklch(0.65_0.22_285)] to-[oklch(0.6_0.2_245)] grid place-items-center text-white text-sm font-bold glow-primary">
-            A
-          </div>
+          <AssetFlowLogo size="xs" className="rounded-lg" />
           {!collapsed && (
             <div className="leading-tight">
               <div className="text-sm font-semibold gradient-text">ASSETFLOW</div>
@@ -283,7 +282,7 @@ function AssistantPanel({ open, onClose }: { open: boolean; onClose: () => void 
     try {
       const res = await api<{ answer: string; sources?: { label: string; asset_id: string; url: string }[] }>(
         "/assistant/chat",
-        { method: "POST", body: { message: normalized, history: messages } },
+        { method: "POST", body: { message: normalized, history: messages }, timeoutMs: ASSISTANT_CHAT_TIMEOUT_MS },
       );
 
       let answer = res.answer;
@@ -305,7 +304,14 @@ function AssistantPanel({ open, onClose }: { open: boolean; onClose: () => void 
         sources,
       }]);
     } catch (e) {
-      setMessages([...next, { role: "assistant", content: `Couldn't reach assistant: ${(e as Error).message}` }]);
+      const raw = (e as Error).message;
+      const detail =
+        raw.includes("timed out") || raw.includes("AbortError")
+          ? "The assistant took too long to respond. Please try again — Ollama may still be warming up."
+          : raw.includes("Unable to reach the API")
+            ? "Cannot reach the backend API. Check that the server is running on port 8000."
+            : raw;
+      setMessages([...next, { role: "assistant", content: `Couldn't reach assistant: ${detail}` }]);
     } finally {
       setLoading(false);
     }

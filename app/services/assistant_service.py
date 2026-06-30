@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import re
-import httpx
 
 from app.core.config import settings
 from app.schemas.assistant import AssistantChatRequest, AssistantChatResponse, AssistantSource, ChatMessage
 from app.services import narrative as narr
 from app.services.assistant_routing import resolve_scored_tool
 from app.services.assistant_tools import AssistantTools
+from app.services.ollama_client import ollama_generate, ollama_is_reachable
 from app.services.assistant_parsing import (
     extract_asset_tag,
     extract_employee_query,
@@ -44,7 +44,9 @@ from app.services.assistant_intents import (
     is_worst_health_query,
 )
 
-_OLLAMA_FORMAT_TIMEOUT_SECONDS = 35.0
+_OLLAMA_PROBE_TIMEOUT_SECONDS = 2.0
+_OLLAMA_FORMAT_TIMEOUT_SECONDS = 25.0
+_CHAT_SERVER_BUDGET_SECONDS = 55.0
 
 _HISTORY_EXPAND_WORDS = (
     "they",
@@ -63,6 +65,19 @@ class AssistantService:
         self.tools = tools
 
     async def chat(self, request: AssistantChatRequest) -> AssistantChatResponse:
+        try:
+            return await asyncio.wait_for(
+                self._chat_inner(request),
+                timeout=_CHAT_SERVER_BUDGET_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            return AssistantChatResponse(
+                answer=narr.assistant_capabilities_message(),
+                tools_used=[],
+                sources=[],
+            )
+
+    async def _chat_inner(self, request: AssistantChatRequest) -> AssistantChatResponse:
         message = request.message.strip()
         history = request.history
 
@@ -91,31 +106,36 @@ class AssistantService:
             )
 
         use_fallback = _should_use_fallback_answer(tool_result)
+        answer = fallback
 
         if settings.assistant_use_ollama and not use_fallback:
-            try:
-                ctx = extract_session_context(history)
-                answer = await asyncio.wait_for(
-                    self._ollama_format(
-                        message,
-                        tool_result,
-                        history,
-                        tool_name=tool_name,
-                        focus_asset_tag=ctx.last_asset_tag,
-                    ),
-                    timeout=min(settings.ollama_timeout_seconds, _OLLAMA_FORMAT_TIMEOUT_SECONDS),
-                )
-                validation = tool_result.get("ollama_validation", "relaxed")
-                if not _validate_ollama_output(
-                    answer,
-                    tool_result.get("data_text", ""),
-                    validation=validation,
-                ):
+            if await ollama_is_reachable(probe_timeout=_OLLAMA_PROBE_TIMEOUT_SECONDS):
+                try:
+                    ctx = extract_session_context(history)
+                    ollama_budget = min(
+                        settings.ollama_timeout_seconds,
+                        _OLLAMA_FORMAT_TIMEOUT_SECONDS,
+                    )
+                    answer = await asyncio.wait_for(
+                        self._ollama_format(
+                            message,
+                            tool_result,
+                            history,
+                            tool_name=tool_name,
+                            focus_asset_tag=ctx.last_asset_tag,
+                            timeout=ollama_budget,
+                        ),
+                        timeout=ollama_budget,
+                    )
+                    validation = tool_result.get("ollama_validation", "relaxed")
+                    if not _validate_ollama_output(
+                        answer,
+                        tool_result.get("data_text", ""),
+                        validation=validation,
+                    ):
+                        answer = fallback
+                except (asyncio.TimeoutError, Exception):
                     answer = fallback
-            except (asyncio.TimeoutError, Exception):
-                answer = fallback
-        else:
-            answer = fallback
 
         return AssistantChatResponse(answer=answer, tools_used=tools_used, sources=sources)
 
@@ -280,6 +300,7 @@ class AssistantService:
         *,
         tool_name: str | None = None,
         focus_asset_tag: str | None = None,
+        timeout: float | None = None,
     ) -> str:
         history = history or []
         history_str = ""
@@ -321,23 +342,10 @@ class AssistantService:
             f"Verified tool data:\n{tool_result.get('data_text', '')}\n"
             "Reply:"
         )
-        timeout = settings.ollama_timeout_seconds
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                f"{settings.ollama_base_url}/api/generate",
-                json={
-                    "model": settings.ollama_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {"temperature": 0.3},
-                },
-            )
-            response.raise_for_status()
-            payload = response.json()
-            text = (payload.get("response") or "").strip()
-            if not text:
-                return tool_result.get("fallback_answer", narr.assistant_capabilities_message())
-            return text
+        text = await ollama_generate(prompt, timeout=timeout, temperature=0.3, num_predict=256)
+        if not text:
+            return tool_result.get("fallback_answer", narr.assistant_capabilities_message())
+        return text
 
 
 def _should_use_fallback_answer(tool_result: dict) -> bool:

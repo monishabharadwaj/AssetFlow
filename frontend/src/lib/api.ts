@@ -6,6 +6,8 @@ export const API_BASE_URL =
 
 export const TOKEN_KEY = "assetflow_auth_token";
 const DEFAULT_TIMEOUT_MS = 45_000;
+/** Assistant chat may call Ollama after SQL tools — allow headroom beyond default. */
+export const ASSISTANT_CHAT_TIMEOUT_MS = 90_000;
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

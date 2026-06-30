@@ -155,7 +155,6 @@ def get_dashboard_service(
     repository: DashboardRepository = Depends(get_dashboard_repository),
     prediction_service: PredictionService = Depends(get_prediction_service),
 ) -> DashboardService:
-    prediction_service.ensure_predictions_loaded()
     return DashboardService(repository, prediction_service)
 
 
@@ -164,7 +163,6 @@ def get_recommendation_service(
     dashboard_repository: DashboardRepository = Depends(get_dashboard_repository),
     asset_repository: AssetRepository = Depends(get_asset_repository),
 ) -> RecommendationService:
-    prediction_service.ensure_predictions_loaded()
     return RecommendationService(prediction_service, dashboard_repository, asset_repository)
 
 
@@ -179,7 +177,6 @@ def get_assistant_tools(
     employee_repository: EmployeeRepository = Depends(get_employee_repository),
     health_history_repository: HealthHistoryRepository = Depends(get_health_history_repository),
 ) -> AssistantTools:
-    prediction_service.ensure_predictions_loaded()
     return AssistantTools(
         dashboard_service,
         asset_service,
