@@ -72,5 +72,23 @@ export function formatCurrency(value: string | number | null | undefined): strin
   if (value === null || value === undefined || value === "") return "—";
   const n = typeof value === "string" ? parseFloat(value) : value;
   if (Number.isNaN(n)) return "—";
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(n);
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+/** Executive replacement window from months-until-action (not calendar life remaining). */
+export function formatReplaceWindow(months: number, fromIso?: string): string {
+  const base = fromIso ? new Date(fromIso) : new Date();
+  const target = new Date(base);
+  target.setMonth(target.getMonth() + Math.max(1, months));
+  const q = Math.floor(target.getMonth() / 3) + 1;
+  const year = target.getFullYear();
+  if (months <= 3) {
+    return target.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  }
+  return `Q${q} ${year}`;
 }

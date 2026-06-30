@@ -109,6 +109,7 @@ function Dashboard() {
           scoredAssets={fleet.scoredAssets}
           highRiskCount={fleet.highRiskCount}
           highRiskItems={fleet.highRiskItems}
+          avgHealthPct={fleet.avgHealthPct}
           cacheWarm={fleet.cacheWarm}
           loading={fleet.isLoading}
           scoringPending={scoreBatch.isPending}

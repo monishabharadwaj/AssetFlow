@@ -23,7 +23,7 @@ Report to leadership in plain English — not spreadsheet noise.
 ---
 
 
-> *"I built an end-to-end enterprise asset management platform — not a todo app. The backend is layered FastAPI with 35+ domain services, PostgreSQL, and Alembic migrations. The frontend is a production-style React 19 console with TanStack Router, role-based UI, and real-time analytics. I integrated a custom FT-Transformer model for health prediction, a tool-based AI assistant grounded in live SQL data, and optional Ollama LLM enhancement for executive reports — with graceful fallbacks when AI is offline."*
+> *"Built an end-to-end enterprise asset management platform . The backend is layered FastAPI with 35+ domain services, PostgreSQL, and Alembic migrations. The frontend is a production-style React 19 console with TanStack Router, role-based UI, and real-time analytics. Integrated a custom FT-Transformer model for health prediction, a tool-based AI assistant grounded in live SQL data, and optional Ollama LLM enhancement for executive reports — with graceful fallbacks when AI is offline."*
 
 **What this demonstrates:** system design, API design, ML integration, security (JWT/RBAC), UX for enterprise users, and shipping a coherent product — not isolated tutorials.
 

@@ -15,7 +15,7 @@ class CostOptimizationService:
         self.maintenance_repository = maintenance_repository
 
     def analyze(
-        self, *, limit: int = 15, department_id: uuid.UUID | None = None
+        self, *, limit: int = 15, department_id=None
     ) -> CostOptimizationResponse:
         items: list[CostOptimizationItem] = []
         page = 1
@@ -69,17 +69,23 @@ class CostOptimizationService:
         maint_spend: float,
         purchase: float,
     ) -> str:
-        if ratio >= 0.5:
+        pct = int(round(ratio * 100))
+        base = (
+            f"Lifetime service spend reached {pct}% of acquisition cost "
+            f"(${maint_spend:,.0f} vs ${purchase:,.0f})."
+        )
+        if ratio >= 2.0:
             return (
-                f"{asset_name} maintenance spend (${maint_spend:,.0f}) exceeds 50% of purchase "
-                f"cost (${purchase:,.0f}). Evaluate replacement vs. continued repairs."
+                f"Data review recommended — cumulative service exceeds 2× acquisition cost. "
+                f"{base} Replacement likely cheaper than the next 12 months of repairs."
             )
+        if ratio >= 0.5:
+            return f"{base} Replacement likely cheaper than the next 12 months of repairs."
         if ratio >= 0.3:
             return (
-                f"{asset_name} TCO ratio is {ratio:.0%}. Review preventive maintenance strategy "
-                f"or plan replacement within the next budget cycle."
+                f"{base} Review preventive maintenance strategy or plan replacement "
+                f"within the next budget cycle."
             )
         return (
-            f"{asset_name} maintenance costs are rising (${maint_spend:,.0f}). "
-            f"Monitor closely and consolidate service visits."
+            f"{base} Monitor closely and consolidate service visits to slow TCO growth."
         )

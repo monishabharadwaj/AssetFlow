@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+
+import { PasswordField } from "@/components/password-field";
 import { useAuth } from "@/lib/auth-context";
 import { changePasswordRequest } from "@/features/auth/api";
 
@@ -44,22 +46,18 @@ function ChangePassword() {
           </p>
         </div>
         {error && <div className="rounded-lg border border-critical/40 bg-critical/10 px-3 py-2 text-sm">{error}</div>}
-        {[
-          ["Current password", current, setCurrent],
-          ["New password", next, setNext],
-          ["Confirm new password", confirm, setConfirm],
-        ].map(([label, val, set]) => (
-          <div key={label as string} className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">{label as string}</label>
-            <input
-              type="password"
-              required
-              value={val as string}
-              onChange={(e) => (set as (s: string) => void)(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring/50"
-            />
-          </div>
-        ))}
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground">Current password</label>
+          <PasswordField value={current} onChange={setCurrent} required autoComplete="current-password" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground">New password</label>
+          <PasswordField value={next} onChange={setNext} required autoComplete="new-password" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground">Confirm new password</label>
+          <PasswordField value={confirm} onChange={setConfirm} required autoComplete="new-password" />
+        </div>
         <button disabled={busy} className="w-full h-10 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-60">
           {busy ? "Saving…" : "Save password"}
         </button>

@@ -128,8 +128,17 @@ export interface OperationsReport {
   appendices?: {
     health_drift?: { name: string; current: number; previous: number }[];
     cost_optimization?: { name: string; savings: number }[];
-    replacement_planning?: { asset_tag: string; name: string; recommended_year: number; reason?: string }[];
-    maintenance_schedule?: { asset_tag: string; name: string; due: string; priority: Priority }[];
+    replacement_planning?: {
+      asset_tag: string;
+      name: string;
+      priority: Priority;
+      healthPct: number | null;
+      lifeRemainingPct: number;
+      replaceWithinMonths: number;
+      recommendedWindow: string;
+      reason?: string;
+    }[];
+    maintenance_schedule?: { asset_tag: string; name: string; dueWindow: string; dueDays?: number; priority: Priority }[];
     benchmarks?: { label: string; value: number; company_avg?: number }[];
     health_trend_chart?: { label: string; value: number }[];
     department_comparison?: { label: string; value: number }[];

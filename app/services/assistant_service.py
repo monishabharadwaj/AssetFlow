@@ -7,6 +7,7 @@ import httpx
 from app.core.config import settings
 from app.schemas.assistant import AssistantChatRequest, AssistantChatResponse, AssistantSource, ChatMessage
 from app.services import narrative as narr
+from app.services.assistant_routing import resolve_scored_tool
 from app.services.assistant_tools import AssistantTools
 from app.services.assistant_parsing import (
     extract_asset_tag,
@@ -261,6 +262,10 @@ class AssistantService:
 
         if is_search_query(message):
             return self.tools.search_assets(message), "search_assets"
+
+        scored_result, scored_tool = resolve_scored_tool(self.tools, message)
+        if scored_tool:
+            return scored_result, scored_tool
 
         if len(lower) < 4:
             return self.tools.get_help(), "get_help"

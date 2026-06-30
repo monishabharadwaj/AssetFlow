@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { Card, CardHeader, EmptyState, Skeleton } from "@/components/ui-bits";
-import { ChartTooltip } from "@/lib/chart-tooltip";
 import { glassCardClass } from "@/features/dashboard/components/dashboard-styles";
+import { chartTooltipStyle } from "@/lib/chart-theme";
 import { fmtDate } from "@/lib/format";
 import type { AttentionItem } from "@/lib/types/ui";
 import { cn } from "@/lib/utils";
@@ -46,85 +46,93 @@ export function PriorityAlertsPanel({
       const key = TYPE_LABELS[item.item_type ?? ""] ? (item.item_type ?? "OTHER") : "OTHER";
       buckets.set(key, (buckets.get(key) ?? 0) + 1);
     }
-    return [...buckets.entries()].map(([type, value]) => ({
-      type,
-      name: TYPE_LABELS[type] ?? "Other",
-      value,
-      color: TYPE_COLORS[type] ?? TYPE_COLORS.OTHER,
-    }));
+    return [...buckets.entries()]
+      .map(([type, value]) => ({
+        type,
+        name: TYPE_LABELS[type] ?? "Other",
+        value,
+        color: TYPE_COLORS[type] ?? TYPE_COLORS.OTHER,
+      }))
+      .sort((a, b) => b.value - a.value);
   }, [attentionItems]);
 
   const total = chartData.reduce((a, b) => a + b.value, 0);
-  const hasChart = total > 0;
+  const hasAttention = total > 0;
   const hasMaintenance = (upcomingMaintenance?.length ?? 0) > 0;
+  const singleCategory = chartData.length === 1;
 
   return (
-    <Card className={cn(glassCardClass(), "h-full max-h-56")}>
-      <CardHeader title="Maintenance & alerts" subtitle="Attention items by category" />
+    <Card className={cn(glassCardClass(), "h-full max-h-72 overflow-hidden flex flex-col")}>
+      <CardHeader
+        title="Maintenance & alerts"
+        subtitle="Items needing action from AI scoring and maintenance queue"
+      />
       {loading ? (
-        <Skeleton className="h-36" />
-      ) : hasChart ? (
-        <div className="grid grid-cols-2 gap-2 h-36">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                dataKey="value"
-                innerRadius={28}
-                outerRadius={44}
-                paddingAngle={2}
-                stroke="none"
-              >
-                {chartData.map((d) => (
-                  <Cell key={d.type} fill={d.color} />
-                ))}
-              </Pie>
-              <ChartTooltip
-                formatter={(value, _name, props) => {
-                  const num = Number(value);
-                  const label = (props as { payload?: { name: string } }).payload?.name ?? "";
-                  const pctVal = total > 0 ? Math.round((num / total) * 100) : 0;
-                  return [`${num} (${pctVal}%)`, label];
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <ul className="flex flex-col justify-center gap-1 text-[10px] min-w-0">
-            {chartData.map((d) => (
-              <li key={d.type} className="flex items-center justify-between gap-1">
-                <span className="flex items-center gap-1 text-muted-foreground truncate">
-                  <span className="size-2 rounded-full shrink-0" style={{ background: d.color }} />
-                  {d.name}
-                </span>
-                <span className="tabular-nums font-medium text-foreground shrink-0">
-                  {d.value}
-                  <span className="text-muted-foreground ml-0.5">
-                    ({total > 0 ? Math.round((d.value / total) * 100) : 0}%)
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : hasMaintenance ? (
-        <ul className="space-y-1.5 text-xs max-h-36 overflow-y-auto">
-          {upcomingMaintenance!.slice(0, 5).map((m, i) => (
-            <li key={`${m.asset_id}-${i}`}>
-              <Link
-                to="/assets/$id"
-                params={{ id: m.asset_id }}
-                className="flex justify-between gap-2 rounded-md border border-border/80 px-2 py-1.5 hover:bg-accent/30"
-              >
-                <span className="font-medium truncate">{m.asset_tag}</span>
-                <span className="text-muted-foreground shrink-0">
-                  {m.scheduled_date ? fmtDate(m.scheduled_date) : "TBD"}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
+        <Skeleton className="h-44 flex-1" />
+      ) : !hasAttention && !hasMaintenance ? (
         <EmptyState title="No alerts" hint="Attention items appear after fleet analysis." />
+      ) : (
+        <div className="flex flex-col gap-2 flex-1 min-h-0">
+          {hasAttention && singleCategory ? (
+            <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Attention queue</div>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-3xl font-semibold tabular-nums">{chartData[0].value}</span>
+                <span className="text-sm text-muted-foreground">{chartData[0].name}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {total === 1
+                  ? "One item flagged for follow-up."
+                  : `${total} items — all in the same category (${chartData[0].name.toLowerCase()}).`}
+              </p>
+            </div>
+          ) : hasAttention ? (
+            <div className="h-28 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} layout="vertical" margin={{ left: 4, right: 8 }}>
+                  <CartesianGrid stroke="rgba(255,255,255,0.05)" horizontal={false} />
+                  <XAxis type="number" tick={{ fill: "rgb(160,160,180)", fontSize: 9 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={72}
+                    tick={{ fill: "rgb(160,160,180)", fontSize: 9 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={14}>
+                    {chartData.map((d) => (
+                      <Cell key={d.type} fill={d.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : null}
+
+          {hasMaintenance && (
+            <div className={cn("min-h-0", hasAttention ? "border-t border-border/60 pt-2" : "")}>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Upcoming</div>
+              <ul className="space-y-1 text-xs max-h-20 overflow-y-auto">
+                {upcomingMaintenance!.slice(0, 3).map((m, i) => (
+                  <li key={`${m.asset_id}-${i}`}>
+                    <Link
+                      to="/assets/$id"
+                      params={{ id: m.asset_id }}
+                      className="flex justify-between gap-2 rounded-md border border-border/80 px-2 py-1 hover:bg-accent/30"
+                    >
+                      <span className="font-medium truncate">{m.asset_tag}</span>
+                      <span className="text-muted-foreground shrink-0">
+                        {m.scheduled_date ? fmtDate(m.scheduled_date) : "TBD"}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
     </Card>
   );

@@ -209,6 +209,9 @@ export type ReportsAnalytics = {
       priority: string;
       why_replace: string;
       remaining_useful_life_months: number;
+      replace_within_months?: number;
+      health_score?: number | null;
+      life_remaining_pct?: number;
     }>;
     ai_insight: string;
   };

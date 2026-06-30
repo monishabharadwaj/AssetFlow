@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 
+import { PasswordField } from "@/components/password-field";
 import { EnterpriseHero } from "@/features/auth/components/enterprise-hero";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
@@ -47,9 +48,26 @@ function LoginPage() {
             <div className="text-[10px] text-muted-foreground tracking-wider">ENTERPRISE</div>
           </div>
         </div>
-        <div className="space-y-4">
-          <h1 className="text-4xl font-semibold leading-tight">Intelligent asset<br />lifecycle management.</h1>
-          <p className="text-muted-foreground max-w-md">Operations, maintenance, and executive reporting — backed by predictive insights across your entire fleet.</p>
+        <div className="space-y-5">
+          <div className="space-y-3">
+            <h1
+              className="text-[2.35rem] leading-[1.15] font-medium text-foreground"
+              style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+            >
+              Fleet lifecycle control<br />for operations teams.
+            </h1>
+            <p className="text-muted-foreground max-w-md text-[15px] leading-relaxed">
+              Register assets, assign them to people, schedule maintenance, and read health scores —
+              scoped to your role and department in one console.
+            </p>
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground/90 tracking-wide">
+              <li>Lifecycle</li>
+              <li className="text-border">·</li>
+              <li>Intelligence</li>
+              <li className="text-border">·</li>
+              <li>Reporting</li>
+            </ul>
+          </div>
           <EnterpriseHero />
         </div>
         <p className="text-xs text-muted-foreground">© AssetFlow AI</p>
@@ -73,18 +91,13 @@ function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               className="w-full h-10 px-3 rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring/50"
             />
           </div>
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring/50"
-            />
+            <PasswordField value={password} onChange={setPassword} required autoComplete="current-password" />
           </div>
           <button
             type="submit"

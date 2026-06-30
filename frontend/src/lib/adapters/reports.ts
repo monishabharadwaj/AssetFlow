@@ -1,17 +1,16 @@
 import type { ReportsAnalytics } from "@/lib/types/backend";
-import type { OperationsReport } from "@/lib/types/ui";
+import type { OperationsReport, Priority } from "@/lib/types/ui";
+import { formatCurrency, formatReplaceWindow } from "@/lib/format";
 
 export function mapReportsAnalytics(data: ReportsAnalytics, enhanced: boolean): OperationsReport {
+  const savings = Number(data.kpis.estimated_annual_savings ?? data.cost.estimated_annual_savings ?? 0);
   const metrics = [
     { label: "Active assets", value: data.kpis.active_assets ?? "—" },
     { label: "Avg fleet health", value: `${data.kpis.avg_fleet_health_pct ?? "—"}%` },
     { label: "High risk", value: data.kpis.high_risk_assets ?? "—" },
     { label: "Maintenance due", value: data.kpis.maintenance_due ?? "—" },
     { label: "Drift alerts", value: data.kpis.drift_alerts ?? "—" },
-    {
-      label: "Est. savings",
-      value: `$${Number(data.kpis.estimated_annual_savings ?? data.cost.estimated_annual_savings ?? 0).toLocaleString()}`,
-    },
+    { label: "Est. savings", value: formatCurrency(savings) },
   ];
 
   if (data.benchmarks) {
@@ -82,17 +81,25 @@ export function mapReportsAnalytics(data: ReportsAnalytics, enhanced: boolean): 
         name: p.label,
         savings: p.value,
       })),
-      replacement_planning: data.replacement.items.map((item) => ({
-        asset_tag: item.asset_tag,
-        name: item.asset_name,
-        recommended_year: new Date().getFullYear() + Math.ceil(item.remaining_useful_life_months / 12),
-        reason: item.why_replace,
-      })),
+      replacement_planning: data.replacement.items.map((item) => {
+        const months = item.replace_within_months ?? item.remaining_useful_life_months;
+        return {
+          asset_tag: item.asset_tag,
+          name: item.asset_name,
+          priority: item.priority as Priority,
+          healthPct: item.health_score != null ? Math.round(item.health_score * 100) : null,
+          lifeRemainingPct: item.life_remaining_pct ?? 0,
+          replaceWithinMonths: months,
+          recommendedWindow: formatReplaceWindow(months, data.generated_at),
+          reason: item.why_replace,
+        };
+      }),
       maintenance_schedule: data.maintenance.items.map((item) => ({
         asset_tag: item.asset_tag,
         name: item.asset_name,
-        due: item.suggested_window,
-        priority: (item.suggested_within_days <= 7 ? "HIGH" : item.suggested_within_days <= 30 ? "MEDIUM" : "LOW") as "HIGH" | "MEDIUM" | "LOW",
+        dueWindow: item.suggested_window,
+        dueDays: item.suggested_within_days,
+        priority: (item.suggested_within_days <= 7 ? "HIGH" : item.suggested_within_days <= 30 ? "MEDIUM" : "LOW") as Priority,
       })),
       health_trend_chart: data.drift.health_trend_chart,
       department_comparison: data.drift.department_comparison,

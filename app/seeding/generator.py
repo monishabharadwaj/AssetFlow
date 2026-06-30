@@ -543,8 +543,13 @@ def seed_history(
         if rng.random() < 0.08:
             asset.warranty_expiry = date.today() + timedelta(days=rng.randint(5, 28))
 
-        # Completed maintenance history consistent with the band.
+        # Completed maintenance history consistent with the band (costs scaled to purchase).
+        purchase_f = float(asset.purchase_cost or 1000)
+        maint_cap = purchase_f * (1.2 if band == "CRITICAL" else 0.8)
+        asset_maint_total = 0.0
         for k in range(features["maintenance_count"]):
+            if asset_maint_total >= maint_cap:
+                break
             offset = min(days_since + k * rng.randint(60, 140), age)
             sched = date.today() - timedelta(days=offset)
             mtype = rng.choices(
@@ -557,6 +562,13 @@ def seed_history(
                 weights=[0.5, 0.2, 0.2, 0.1],
                 k=1,
             )[0]
+            event_cost = min(
+                purchase_f * rng.uniform(0.02, 0.15),
+                max(0.0, maint_cap - asset_maint_total),
+            )
+            if event_cost < 25:
+                continue
+            asset_maint_total += event_cost
             maintenance.append(
                 MaintenanceRecord(
                     asset_id=asset.id,
@@ -564,7 +576,7 @@ def seed_history(
                     status=MaintenanceStatus.COMPLETED,
                     scheduled_date=sched,
                     completed_date=sched + timedelta(days=rng.randint(1, 7)),
-                    cost=Decimal(str(rng.randint(50, 2500))),
+                    cost=Decimal(str(round(event_cost, 2))),
                     description=f"{maint_descriptions[mtype]} for {asset.asset_tag}",
                     service_provider=rng.choice(["Internal IT", "VendorCare", "FleetServe"]),
                 )

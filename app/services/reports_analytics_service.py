@@ -30,7 +30,7 @@ from app.services.maintenance_scheduling_service import MaintenanceSchedulingSer
 from app.services.ollama_client import ollama_generate
 from app.services.prediction_service import get_prediction_cache
 from app.services.recommendation_service import RecommendationService
-from app.services.replacement_planning_service import ReplacementPlanningService
+from app.services.replacement_planning_service import ReplacementPlanningService, count_life_health_divergence
 
 
 def compute_org_benchmarks(
@@ -294,7 +294,7 @@ class ReportsAnalyticsService:
             for k, v in sorted(dept_costs.items(), key=lambda x: -x[1])[:8]
         ]
         savings = sum(i.maintenance_spend * 0.25 for i in cost_data.items if i.tco_ratio >= 0.3)
-        opportunities = [i.recommendation for i in cost_data.items[:5]]
+        opportunities = [i.recommendation for i in cost_data.items[:3]]
         ai_insight = (
             f"Identified ${savings:,.0f} in potential annual savings by replacing or rebalancing "
             f"high-TCO assets and consolidating maintenance for {len(cost_data.items)} flagged items."
@@ -372,46 +372,127 @@ class ReportsAnalyticsService:
             skip_risk_summary=skip_risk,
         )
 
+    @staticmethod
+    def _build_prioritized_actions(recs, replacement, cost, maintenance) -> list[str]:
+        seen: set[str] = set()
+        actions: list[str] = []
+
+        for r in recs.items[:5]:
+            tag = r.asset_tag
+            if tag in seen:
+                continue
+            seen.add(tag)
+            pri = r.priority.value if hasattr(r.priority, "value") else str(r.priority)
+            actions.append(
+                f"{pri} | {tag} | Schedule maintenance | {r.title} | within {r.suggested_within_days} days"
+            )
+
+        for item in replacement.items:
+            if item.priority != "HIGH":
+                continue
+            if item.asset_tag in seen:
+                continue
+            seen.add(item.asset_tag)
+            why = (item.why_replace or "")[:90]
+            months = getattr(item, "replace_within_months", None) or item.remaining_useful_life_months
+            actions.append(
+                f"HIGH | {item.asset_tag} | Capital refresh | {why} | within {months} months"
+            )
+
+        for c in cost.items[:3]:
+            if c.asset_tag in seen:
+                continue
+            seen.add(c.asset_tag)
+            why = (c.recommendation or "")[:90]
+            actions.append(
+                f"{c.priority} | {c.asset_tag} | TCO review | {why} | this quarter"
+            )
+
+        for item in maintenance.items[:2]:
+            if item.asset_tag in seen:
+                continue
+            seen.add(item.asset_tag)
+            actions.append(
+                f"MEDIUM | {item.asset_tag} | Preventive service | {item.rationale[:80]} | "
+                f"within {item.suggested_within_days} days"
+            )
+
+        return actions[:6]
+
     def _build_executive_sections(self, *, summary, predictions, recs, drift, cost, replacement, maintenance, kpis):
         high_risk_names = [p.asset_tag or p.asset_name for p in predictions if p.risk_level.value == "HIGH"][:5]
+        dept_rows = drift.department_comparison[:5]
+        best_row = max(dept_rows, key=lambda c: c.value) if dept_rows else None
+        worst_row = min(dept_rows, key=lambda c: c.value) if dept_rows else None
+        medium_count = sum(1 for p in predictions if p.risk_level.value == "MEDIUM")
+        divergence_count = count_life_health_divergence(replacement.items)
+        prioritized = self._build_prioritized_actions(recs, replacement, cost, maintenance)
+
+        complication = (
+            f"{divergence_count} assets show high calendar life but critically low operational health — "
+            "condition-based degradation, not age alone."
+            if divergence_count
+            else "Operational health broadly tracks asset age across the fleet."
+        )
+
+        exec_summary = (
+            f"The fleet of {summary.total_active_assets} active assets averages "
+            f"{kpis['avg_fleet_health_pct']}% health with {kpis['high_risk_assets']} high-risk units. "
+            f"{complication} "
+            f"Clear overdue maintenance and pursue ${cost.estimated_annual_savings:,.0f} in identified "
+            f"cost-optimization opportunities this quarter."
+        )
+
+        dept_summary = "Department health varies across the organization."
+        dept_bullets: list[str] = []
+        if best_row and worst_row:
+            gap = int(round(best_row.value - worst_row.value))
+            dept_summary = (
+                f"Strongest: {best_row.label} ({int(best_row.value)}%); "
+                f"weakest: {worst_row.label} ({int(worst_row.value)}%) — gap of {gap} points."
+            )
+            dept_bullets = [
+                f"Prioritize recovery support in {worst_row.label} while sustaining {best_row.label} performance."
+            ]
+
         return [
             ReportInsightSection(
                 key="executive_summary",
                 title="Executive Summary",
-                summary=(
-                    f"Fleet of {summary.total_active_assets} active assets at {kpis['avg_fleet_health_pct']}% "
-                    f"average health with {kpis['high_risk_assets']} high-risk units requiring leadership attention."
-                ),
-                bullets=[
-                    f"{summary.maintenance_due_count} maintenance items overdue",
-                    f"{len(drift.deteriorating)} assets with negative health drift",
-                    f"${cost.estimated_annual_savings:,.0f} potential cost savings identified",
+                summary=exec_summary,
+                bullets=prioritized[:3] or [
+                    f"Escalate work on {kpis['high_risk_assets']} high-risk assets",
+                    f"Address {summary.maintenance_due_count} overdue maintenance records",
                 ],
             ),
             ReportInsightSection(
                 key="fleet_health",
                 title="Overall Fleet Health",
-                summary=f"AI scored {len(predictions)} assets. Average health {kpis['avg_fleet_health_pct']}%.",
+                summary=(
+                    f"Scoring covers {len(predictions)} assets. Risk concentration is "
+                    f"{'elevated' if kpis['high_risk_assets'] > 5 else 'moderate'} — "
+                    f"recovery should target deteriorating units before the next pipeline cycle."
+                ),
                 bullets=[
-                    f"High risk: {kpis['high_risk_assets']}",
-                    f"Medium risk: {sum(1 for p in predictions if p.risk_level.value == 'MEDIUM')}",
-                    f"Improving assets: {drift.improving_count}",
+                    f"{drift.improving_count} assets trending healthier since last scoring",
+                    f"{len(drift.deteriorating)} assets with negative health drift",
+                    f"{medium_count} assets in the medium-risk band under active monitoring",
                 ],
             ),
             ReportInsightSection(
                 key="major_events",
                 title="Major Events This Week",
-                summary="Key operational signals from maintenance, drift, and lifecycle planning.",
+                summary="Signals from maintenance queues, drift monitoring, and capital planning.",
                 bullets=[
-                    f"{summary.maintenance_due_count} overdue maintenance records",
-                    f"{len(drift.alerts)} drift alerts generated",
-                    f"{len(replacement.items)} replacement candidates flagged",
+                    f"{len(drift.alerts)} drift alerts from snapshot comparison",
+                    f"{len(replacement.items)} replacement candidates in capital review queue",
+                    f"{len(cost.items)} assets flagged for TCO optimization",
                 ],
             ),
             ReportInsightSection(
                 key="immediate_attention",
                 title="Assets Requiring Immediate Attention",
-                summary="Highest priority assets from AI risk scoring and overdue work.",
+                summary="Highest-priority units from AI risk scoring and overdue work.",
                 bullets=high_risk_names or ["No critical assets — fleet within tolerance"],
             ),
             ReportInsightSection(
@@ -423,20 +504,22 @@ class ReportsAnalyticsService:
             ReportInsightSection(
                 key="department_performance",
                 title="Department-wise Performance",
-                summary="Relative health and workload by department.",
-                bullets=[f"{c.label}: {c.value}% avg health" for c in drift.department_comparison[:5]]
-                or ["Department breakdown available after AI scoring"],
+                summary=dept_summary,
+                bullets=dept_bullets or ["Department breakdown available after AI scoring"],
             ),
             ReportInsightSection(
                 key="ai_observations",
                 title="AI Observations",
-                summary="Model-driven patterns from health predictions and utilization features.",
-                bullets=drift.key_factors[:4],
+                summary="Patterns from health predictions and utilization — validate against field reports.",
+                bullets=drift.key_factors[:4] or ["Fleet health is stable — no major drift drivers identified"],
             ),
             ReportInsightSection(
                 key="risk_analysis",
                 title="Risk Analysis",
-                summary=f"{kpis['high_risk_assets']} assets classified HIGH risk by FT-Transformer model.",
+                summary=(
+                    "Prioritize units where predicted failure exposure and operational impact overlap. "
+                    "Treat items below as work orders, not passive alerts."
+                ),
                 bullets=[r.title for r in recs.items[:4]] or ["Risk levels within normal range"],
             ),
             ReportInsightSection(
@@ -449,24 +532,19 @@ class ReportsAnalyticsService:
                 key="recommended_actions",
                 title="Recommended Actions",
                 summary="Prioritized actions for operations and finance leaders.",
-                bullets=(
-                    [r.title for r in recs.items[:3]]
-                    + cost.opportunities[:2]
-                    + [i.repair_vs_replace for i in replacement.items[:2]]
-                )[:6]
-                or ["Continue monitoring — no urgent actions"],
+                bullets=prioritized or ["Continue monitoring — no urgent actions"],
             ),
             ReportInsightSection(
                 key="expected_impact",
                 title="Expected Impact Next Week",
                 summary=(
-                    "If recommended actions are executed, expect reduced downtime risk and "
-                    "stabilized health scores across high-utilization assets."
+                    "Executing the prioritized action list should reduce downtime exposure and "
+                    "stabilize health scores on high-utilization assets."
                 ),
                 bullets=[
                     "High-risk count should decrease after scheduled maintenance",
                     "Drift alerts should stabilize within one scoring cycle",
-                    f"Potential ${cost.estimated_annual_savings:,.0f} cost avoidance if TCO actions taken",
+                    "Capital candidates with life/health divergence should enter planning review",
                 ],
             ),
         ]
@@ -477,7 +555,9 @@ class ReportsAnalyticsService:
             for s in sections
         )
         prompt = (
-            "You are an enterprise asset management analyst preparing an executive report. "
+            "You are an enterprise asset management analyst preparing an executive report for a board audience. "
+            "Explain any contradiction between calendar life remaining and low AI predicted health. "
+            "Do not repeat the same KPI numbers in every section. "
             "For EACH section below, write a polished 2-3 sentence summary for leadership "
             "and up to 4 concise bullet points. Respond ONLY with valid JSON array:\n"
             '[{"key":"section_key","summary":"...","bullets":["..."]}, ...]\n'
@@ -535,9 +615,29 @@ class ReportsAnalyticsService:
     def _simplify_executive_sections(
         self, sections: list[ReportInsightSection]
     ) -> list[ReportInsightSection]:
+        rewrites: dict[str, str] = {
+            "executive_summary": (
+                "Leadership should act on high-risk assets and overdue maintenance before the next scoring cycle. "
+                "The sections below translate model output into concrete operational priorities."
+            ),
+            "fleet_health": (
+                "Fleet health reflects utilization, maintenance history, and failure signals. "
+                "Use drift and risk bands together — a stable average can still hide localized failures."
+            ),
+            "department_performance": (
+                "Department comparisons reveal where to batch maintenance and where health is slipping. "
+                "Pair these rankings with open workload before reassigning technicians."
+            ),
+            "ai_observations": (
+                "Model observations summarize cross-fleet patterns. Validate against field reports before changing policy."
+            ),
+            "risk_analysis": (
+                "Risk-ranked recommendations reflect predicted failure exposure. Address HIGH items in the maintenance window shown in schedules."
+            ),
+        }
         simplified: list[ReportInsightSection] = []
         for section in sections:
-            summary = self._simplify_text(section.summary)
+            summary = rewrites.get(section.key) or self._simplify_text(section.summary)
             bullets = [self._simplify_text(b) for b in section.bullets[:4]]
             simplified.append(
                 ReportInsightSection(
