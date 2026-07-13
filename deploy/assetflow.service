@@ -1,0 +1,26 @@
+# AssetFlow AI — systemd unit for FastAPI (uvicorn)
+#
+# Install:
+#   sudo cp deploy/assetflow.service /etc/systemd/system/assetflow.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now assetflow
+#   sudo systemctl status assetflow
+#
+# Adjust paths if the repo is cloned somewhere other than /home/ubuntu/AssetFlow-AI.
+# uvicorn binds to 127.0.0.1 only — nginx is the public entry point.
+
+[Unit]
+Description=AssetFlow AI FastAPI
+After=network.target postgresql.service
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/AssetFlow-AI
+EnvironmentFile=/home/ubuntu/AssetFlow-AI/.env
+ExecStart=/home/ubuntu/AssetFlow-AI/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

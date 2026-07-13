@@ -526,6 +526,7 @@ cd frontend && npx tsc --noEmit && npm run build
 | [`docs/FRONTEND_ARCHITECTURE.md`](docs/FRONTEND_ARCHITECTURE.md) | Screen-to-API blueprint |
 | [`ml/README.md`](ml/README.md) | ML commands and artifact layout |
 | [`scripts/dev/README.md`](scripts/dev/README.md) | Diagnostic scripts |
+| [`deploy/DEPLOY_AWS.md`](deploy/DEPLOY_AWS.md) | AWS Option A deploy (no Docker) |
 
 ---
 
