@@ -50,14 +50,21 @@ export function buildQueryString(params: Record<string, unknown>): string {
   return qs ? `?${qs}` : "";
 }
 
+function buildRequestUrl(path: string): URL {
+  const target = path.startsWith("http")
+    ? path
+    : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  if (target.startsWith("http")) return new URL(target);
+  const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  return new URL(target, base);
+}
+
 async function request<T>(path: string, opts: Options = {}): Promise<T> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-  const url = new URL(
-    path.startsWith("http") ? path : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`,
-  );
+  const url = buildRequestUrl(path);
   if (opts.query) {
     for (const [k, v] of Object.entries(opts.query)) {
       if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));

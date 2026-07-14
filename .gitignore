@@ -21,6 +21,7 @@ pytest-cache-files-*/
 node_modules/
 dist/
 build/
+frontend/.env.production
 
 # OS files
 .DS_Store

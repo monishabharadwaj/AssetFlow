@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# Fixed demo asset tags referenced in DEMO.md and walkthroughs.
+# Fixed demo asset tags referenced in README demo walkthrough.
 DEMO_ASSET_TAGS = {
     "laptop": "IT-LAP-0001",
     "vehicle": "OPS-VAN-001",
