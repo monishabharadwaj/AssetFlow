@@ -31,8 +31,6 @@ The system demonstrates **full product ownership**: relational schema design, la
 
 ---
 
-## What I Built
-
 ### Platform capabilities
 
 | Area | Implementation |
