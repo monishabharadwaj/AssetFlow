@@ -47,7 +47,7 @@ The system demonstrates **full product ownership**: relational schema design, la
 
 ### Production deployment (AWS)
 
-Deployed **Option A — all-in-one EC2** without containers:
+Deployed **all-in-one EC2** without containers:
 
 ```text
 Browser → nginx :80
