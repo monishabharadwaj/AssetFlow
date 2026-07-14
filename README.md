@@ -13,7 +13,7 @@
 
 <br/>
 
-[Overview](#overview) · [What I Built](#what-i-built) · [Architecture](#architecture) · [System Flows](#system-flows) · [Intelligence Deep Dive](#intelligence-systems--deep-dive) · [File Structure](#file-structure) · [Local Setup](#local-setup) · [AWS Deployment](#aws-production-deployment) · [Demo](#demo-walkthrough)
+[Overview](#overview) · [Architecture](#architecture) · [Intelligence Deep Dive](#intelligence-systems--deep-dive) · [File Structure](#file-structure) · [Local Setup](#local-setup) · [AWS Deployment](#aws-production-deployment) · [Demo](#demo-walkthrough)
 
 </div>
 
@@ -136,149 +136,23 @@ Strict layered architecture — HTTP handlers never query the database directly.
 
 **Intelligence path:** `FeatureEngineeringService` extracts features from live DB state → `PredictionService` runs FT-Transformer inference → results cached and optionally persisted to `asset_health_history`.
 
-### Data model diagram
+### Data model
 
 | Dataset | Source | Purpose |
 |---------|--------|---------|
 | Operational | `python -m app.seeding --profile demo --reset` | Application demo (~200 assets in PostgreSQL) |
 | Training | `python -m ml.data` → ETL → `python -m ml.train` | File-based parquet under `ml/artifacts/` |
 
-```mermaid
-erDiagram
-  DEPARTMENT ||--o{ EMPLOYEE : employs
-  DEPARTMENT ||--o{ ASSET : owns
-  EMPLOYEE ||--o| USER : logs_in_as
-  ASSET ||--o{ ALLOCATION : assigned_via
-  ASSET ||--o{ MAINTENANCE : serviced_by
-  ASSET ||--o{ HEALTH_HISTORY : scored_in
-  EMPLOYEE ||--o{ ALLOCATION : receives
-```
+**Core entities:** `DEPARTMENT` → `EMPLOYEE` → `USER` (login); `DEPARTMENT` → `ASSET` → `ALLOCATION`, `MAINTENANCE`, `HEALTH_HISTORY`. Training parquet is never imported into PostgreSQL — inference reads `model.pt` and `feature_stats.json` from disk only.
 
-**What this shows:** The operational database models a real org structure. Departments own assets and employ people. Each employee can have one login (`USER`). Assets move through lifecycle events — allocations to employees, maintenance records, and ML health snapshots (`HEALTH_HISTORY`). This schema is what the assistant tools and feature engineering read at runtime. Training parquet files are separate and never imported into these tables.
+### Key runtime flows (text)
 
----
-
-## System Flows
-
-Each diagram below maps a concrete user or system journey. Read the diagram first, then the explanation.
-
-### 1. Authentication and session
-
-```mermaid
-sequenceDiagram
-  actor User
-  participant UI as React Login Page
-  participant API as FastAPI /auth
-  participant DB as PostgreSQL
-
-  User->>UI: Enter email + password
-  UI->>API: POST /api/v1/auth/login
-  API->>DB: Lookup employee + user hash
-  DB-->>API: Credentials valid
-  API-->>UI: JWT access_token
-  UI->>UI: Store token in localStorage
-  UI->>API: GET /api/v1/auth/me (Bearer token)
-  API-->>UI: User profile + role
-  UI->>UI: Redirect to /dashboard
-```
-
-**What this is:** Standard stateless JWT authentication. `AuthService.login()` resolves the employee by email, verifies the bcrypt hash on the linked `User` row, and issues a signed access token containing `user_id` and `role`. The frontend stores the token and attaches it as `Authorization: Bearer` on every subsequent request. `GET /auth/me` hydrates the session with department, job title, and `must_change_password` flag for route guards.
-
-**Why it matters:** All intelligence and assistant endpoints are protected the same way. Role (`ADMIN` / `MANAGER` / `VIEWER`) and department ID from this session drive `AccessContext` — managers never see another department's assets in SQL, not just in the UI.
-
-### 2. API request lifecycle
-
-```mermaid
-flowchart LR
-  A[HTTP Request] --> B[Middleware]
-  B --> C{JWT valid?}
-  C -->|No| D[401 Unauthorized]
-  C -->|Yes| E{RBAC allowed?}
-  E -->|No| F[403 Forbidden]
-  E -->|Yes| G[Pydantic validation]
-  G --> H[Service layer]
-  H --> I[Repository + AccessContext]
-  I --> J[(PostgreSQL)]
-  H --> K[ML / Ollama optional]
-  J --> L[Response DTO]
-  K --> L
-  L --> M[JSON Response]
-```
-
-**What this is:** The guard chain for every protected endpoint. `RequestLoggingMiddleware` records latency. `auth_deps` decodes JWT and loads the user. `enforce_rbac` checks the route's required permission against `permissions.py`. Only then does Pydantic validate the body and the handler delegate to a service.
-
-**Why it matters:** Security and validation happen before any business logic. A VIEWER cannot reach write endpoints even with a valid token. Services receive an `AccessContext` so repositories add `WHERE department_id = …` automatically for scoped roles.
-
-### 3. ML inference (single asset)
-
-```mermaid
-flowchart TB
-  A[Asset in PostgreSQL] --> B[FeatureEngineeringService]
-  B --> C[10-feature vector]
-  C --> D[vectorize_row + feature_stats.json]
-  D --> E[FT-Transformer model.pt]
-  E --> F[Health score 0–1]
-  F --> G[Risk tier thresholds]
-  G --> H[Prediction cache]
-  G --> I[asset_health_history optional]
-  H --> J[Dashboard + Recommendations]
-```
-
-**What this is:** The runtime scoring path from live data to a fleet health number. `FeatureEngineeringService` builds the same 10-column contract used during training (age, utilization, maintenance history, etc.). `vectorize_row()` applies z-score normalization from `feature_stats.json`. The FT-Transformer forward pass returns a continuous health score; `health_thresholds.py` maps it to LOW / MEDIUM / HIGH risk and five-band fleet health for charts.
-
-**Why it matters:** This is true train/serve parity — the model sees identically shaped inputs in training and production. Results land in an in-memory cache for fast dashboard reads and optionally in `asset_health_history` for trend charts and drift detection.
-
-### 4. Intelligence pipeline (batch)
-
-```mermaid
-flowchart LR
-  A[Run AI Pipeline] --> B[score_batch]
-  B --> C[detect_drift]
-  B --> D[run_policies]
-  D --> E[notifications]
-  B --> F[prediction cache warm]
-  F --> G[Dashboard KPIs update]
-```
-
-**What this is:** An orchestrated batch job triggered from the Operations UI (or optional scheduler). `IntelligencePipelineService.run_full_pipeline()` runs four stages in sequence: score every in-scope asset, compare new scores to prior snapshots for drift alerts, evaluate automation policies, and emit in-app notifications for escalations and positive outcomes.
-
-**Why it matters:** Individual prediction is useful; fleet-wide intelligence is what operations teams need. One button refreshes scores, warms the cache, updates KPI donuts, and creates actionable notifications — without the user waiting for per-asset API calls.
-
-### 5. AI assistant
-
-```mermaid
-flowchart TB
-  Q[User question] --> P[assistant_parsing]
-  P --> I[assistant_intents classify]
-  I --> T[assistant_tools SQL-backed]
-  T --> R[Structured result + sources]
-  R --> N{Ollama enabled?}
-  N -->|Yes| O[Polish phrasing]
-  N -->|No| M[Template response]
-  O --> M
-  M --> A[AssistantChatResponse]
-```
-
-**What this is:** A **grounded** question-answering system, not a free-form chatbot. Natural language is parsed for asset tags, employee names, and follow-up context. Intent classifiers route to one of 25+ tool functions in `AssistantTools` that query PostgreSQL via repositories. The response includes `tools_used` and `sources` for auditability. Ollama, if enabled, only rewrites prose — it cannot change counts or invent asset tags.
-
-**Why it matters:** Enterprise users need correct inventory answers. This architecture prioritizes **factual grounding over fluency**, with optional LLM polish when Ollama is available.
-
-### 6. Production routing (AWS)
-
-```mermaid
-flowchart TB
-  B[Browser] --> N[nginx :80]
-  N -->|GET /login, /dashboard| S[/var/www/assetflow SPA]
-  N -->|GET/POST /api/v1/*| U[uvicorn :8000 systemd]
-  N -->|GET /health /ready /docs| U
-  U --> P[(PostgreSQL)]
-  U --> M[ml/artifacts/]
-  S -->|fetch /api/v1| N
-```
-
-**What this is:** Same-origin production topology. The browser only connects to nginx on port 80. Static files come from `/var/www/assetflow`. API calls to `/api/v1/*` are reverse-proxied to uvicorn bound on `127.0.0.1:8000` (not publicly exposed). Health and OpenAPI docs use the same proxy path.
-
-**Why it matters:** No CORS complexity in production; one TLS termination point later. The frontend is built with `VITE_API_BASE_URL=/api/v1` so fetch calls stay on the same host as the SPA.
+- **Auth:** Login → JWT in localStorage → `Bearer` on every request → `AccessContext` scopes data by role and department.
+- **API:** Middleware → JWT → RBAC → Pydantic validation → service → repository → PostgreSQL (optional ML/Ollama in service layer).
+- **Inference:** DB features → `vectorize_row` → FT-Transformer → health score → risk tier → prediction cache + optional history row.
+- **Batch pipeline:** `score_batch` → drift detection → policy automation → in-app notifications.
+- **Assistant:** Parse message → classify intent → SQL-backed tool → template answer (optional Ollama polish).
+- **Production:** Browser → nginx :80 → SPA at `/var/www/assetflow` + `/api/v1` proxied to uvicorn on `127.0.0.1:8000`.
 
 ---
 
@@ -484,6 +358,8 @@ Aggregates: dashboard metrics, recommendations, drift, replacement plan, cost an
 ---
 
 ### F. How ML, DL, and AI fit together
+
+The diagram below is the second core view: how the three intelligence layers connect.
 
 ```mermaid
 flowchart TB
