@@ -107,57 +107,67 @@ function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-background">
-      {/* Desktop: full-viewport hero; sign-in floats on the right */}
+    <div className="relative min-h-screen overflow-hidden">
       <div
-        className="hidden lg:flex flex-col justify-between min-h-screen p-12 xl:p-14 pr-[22rem] xl:pr-[26rem] bg-gradient-to-br from-[oklch(0.22_0.05_285)] via-[oklch(0.19_0.03_270)] to-[oklch(0.16_0.02_240)]"
-      >
-        <div className="flex items-center gap-3">
-          <AssetFlowLogo size="sm" />
-          <div>
-            <div className="text-lg font-bold tracking-wide gradient-text">ASSETFLOW AI</div>
-            <div className="text-xs text-muted-foreground tracking-[0.2em] font-medium">ENTERPRISE</div>
-          </div>
-        </div>
-        <div className="space-y-6 flex-1 flex flex-col justify-center">
-          <div className="space-y-4">
-            <h1
-              className="text-[2.75rem] xl:text-[3rem] leading-[1.12] font-medium text-foreground max-w-xl"
-              style={{ fontFamily: "'Fraunces', Georgia, serif" }}
-            >
-              Fleet lifecycle control<br />for operations teams.
-            </h1>
-            <div className="text-muted-foreground max-w-lg text-lg leading-relaxed space-y-2">
-              <p>
-                Register assets, assign them to people, schedule maintenance, and read health scores —
-                scoped to your role and department in one console.
-              </p>
-              <p>
-                AI health scoring and drift monitoring across the fleet — act before failures hit operations.
-              </p>
-              <p>
-                Tool-grounded assistant and executive reports for leaders — maintenance, capital, and cost in plain English.
-              </p>
-            </div>
-            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground/90 tracking-wide pt-1">
-              <li>Lifecycle</li>
-              <li className="text-border">·</li>
-              <li>Intelligence</li>
-              <li className="text-border">·</li>
-              <li>Reporting</li>
-            </ul>
-          </div>
-          <EnterpriseHero />
-        </div>
-        <p className="text-xs text-muted-foreground">© AssetFlow AI</p>
-      </div>
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url(/login-background.png)" }}
+        aria-hidden
+      />
+      <div
+        className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/80 to-background/55"
+        aria-hidden
+      />
 
-      <div className="hidden lg:block absolute right-8 xl:right-12 top-1/2 -translate-y-1/2 z-20 w-[24rem]">
-        <SignInCard {...signInProps} />
+      {/* Desktop */}
+      <div className="relative z-10 hidden lg:flex min-h-screen">
+        <div className="flex flex-1 flex-col justify-between p-12 xl:p-14 pr-8 max-w-4xl">
+          <div className="flex items-center gap-3">
+            <AssetFlowLogo size="sm" />
+            <div>
+              <div className="text-lg font-bold tracking-wide gradient-text">ASSETFLOW AI</div>
+              <div className="text-xs text-muted-foreground tracking-[0.2em] font-medium">ENTERPRISE</div>
+            </div>
+          </div>
+          <div className="space-y-6 flex-1 flex flex-col justify-center py-8">
+            <div className="space-y-4">
+              <h1
+                className="text-[2.75rem] xl:text-[3rem] leading-[1.12] font-medium text-foreground max-w-xl drop-shadow-sm"
+                style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+              >
+                Asset lifecycle operations<br />for operations teams.
+              </h1>
+              <div className="text-muted-foreground max-w-lg text-lg leading-relaxed space-y-2">
+                <p>
+                  Register assets, assign them to people, schedule maintenance, and read health scores —
+                  scoped to your role and department in one console.
+                </p>
+                <p>
+                  AI health scoring and drift monitoring across the fleet — act before failures hit operations.
+                </p>
+                <p>
+                  Tool-grounded assistant and executive reports for leaders — maintenance, capital, and cost in plain English.
+                </p>
+              </div>
+              <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground/90 tracking-wide pt-1">
+                <li>Lifecycle</li>
+                <li className="text-border">·</li>
+                <li>Intelligence</li>
+                <li className="text-border">·</li>
+                <li>Reporting</li>
+              </ul>
+            </div>
+            <EnterpriseHero className="self-start -ml-2" />
+          </div>
+          <p className="text-xs text-muted-foreground">© AssetFlow AI</p>
+        </div>
+
+        <div className="flex w-[min(100%,26rem)] shrink-0 items-center justify-center px-8 xl:px-12 mr-8 xl:mr-16">
+          <SignInCard {...signInProps} />
+        </div>
       </div>
 
       {/* Mobile: centered card + brand */}
-      <div className="lg:hidden flex flex-col items-center justify-center min-h-screen p-6 gap-8">
+      <div className="relative z-10 lg:hidden flex flex-col items-center justify-center min-h-screen p-6 gap-8">
         <div className="flex items-center gap-3">
           <AssetFlowLogo size="sm" />
           <div>
